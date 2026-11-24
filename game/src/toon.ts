@@ -1,6 +1,8 @@
+import {buildShelter,shelter,chime} from './shelter.ts';
 import * as T from 'three';
 import './toon.css';
 import {BUILDINGS,BRIDGE_X,canWalk,findRoute,riverCenter,terrainHeight,type Position} from './world3d.ts';
+import {buildRetreat,shrine,bell} from './retreat.ts';
 import {expandLandscape,batchStaticLandscape} from './landscape.ts';
 import {connectVillageAudio} from './village-audio.ts';
 
@@ -92,6 +94,10 @@ cylinder(.55,.55,.12,palette.trim,scene,-7,.95,-.7);cylinder(.12,.15,.4,palette.
 for(const x of [-7.8,-6.2])cylinder(.3,.3,.18,'#d8bc81',scene,x,.66,-.5);
 for(let i=0;i<8;i++){const stone=ball(.34,'#c6bea6',scene,-.7+Math.sin(i)*.32,.06,-2-i*.8,1.3,.15,.8);stone.castShadow=false;}
 
+const retreat=buildRetreat(scene);
+const rest=buildShelter(scene);
+const near=(point:Position,x:number,z:number,r:number)=>Math.hypot(point.x-x,point.z-z)<r;
+let viewing=false;
 const animateLandscape=expandLandscape(scene);
 function person(color:string){const root=new T.Group();root.userData.dynamic=true;scene.add(root);
   const body=cylinder(.33,.45,.72,color,root,0,.86,0);
@@ -137,6 +143,11 @@ const villagers=homes.map(([x,z],kind)=>{
 });
 let greetingUntil=0;
 $('greet').onclick=()=>{
+ const {x,z}=player.root.position;
+ if(near(chime,x,z,1.65)){rest.ring();return;}
+ if(near(shelter,x,z,4.5)){rest.toggle();return;}
+ if(retreat.interact(x,z))return;
+ if(Math.hypot(x-shrine.x,z-shrine.z)<7){viewing=!viewing;overview=false;zoom=viewing?2.4:1;updateCamera();return;}
  const nearest=[...villagers].sort((a,b)=>a.actor.root.position.distanceTo(player.root.position)-b.actor.root.position.distanceTo(player.root.position))[0];
  if(nearest.actor.root.position.distanceTo(player.root.position)>4){message('가까운 주민에게 다가가 주세요.');return;}
  greetingUntil=performance.now()+1800;
@@ -158,7 +169,10 @@ petals.userData.dynamic=true;
 for(let i=0;i<42;i++){const petal=mesh(new T.SphereGeometry(.055,5,4),'#f1c4cc',petals,(rand()-.5)*30,1+rand()*7,(rand()-.5)*28);petal.scale.set(1,.25,.65);petal.castShadow=false;}
 const ripples:Array<T.Mesh>=[];
 for(let i=0;i<4;i++){const ring=mesh(new T.RingGeometry(.45,.47,40),'#b4e3d5',pond,-2+i*1.2,.16,-1+i*.4);ring.userData.dynamic=true;ring.rotation.x=-Math.PI/2;ring.castShadow=false;ripples.push(ring);}
-const player=person('#729cae');player.root.position.set(0,0,5);
+const player=person('#729cae');
+const visit=new URLSearchParams(location.search).get('visit');
+const arrival=visit==='valley'?{x:shelter.x,z:shelter.z+3}:visit==='statue'?{x:shrine.x,z:shrine.z+5}:{x:0,z:5};
+player.root.position.set(arrival.x,terrainHeight(arrival.x,arrival.z),arrival.z);
 // A small straw hat and its woven rim identify the player without adding instructional text.
 cylinder(.71,.74,.055,'#dfbc72',player.root,0,2.04,0,32);
 ball(.46,'#c6a066',player.root,0,2.12,0,1,.55,1);
@@ -169,13 +183,13 @@ const marker=mesh(new T.RingGeometry(.22,.29,28),'#fff4cd');marker.rotation.x=-M
 marker.userData.dynamic=true;
 let route:Position[]=[],angle=.42,zoom=1,moving=false;
 let overview=false;
-const focus=new T.Vector3(0,0,3);
+const focus=player.root.position.clone();
 connectVillageAudio($<HTMLButtonElement>('sound'));
 const pressed=new Set<string>();
 function message(_text:string){document.querySelector('.stage')?.classList.remove('invalid');requestAnimationFrame(()=>document.querySelector('.stage')?.classList.add('invalid'));}
 function showError(description:string){const loading=$('loading');loading.hidden=false;loading.classList.add('error');loading.setAttribute('aria-label',description);const retry=document.createElement('button');retry.setAttribute('aria-label','다시 불러오기');retry.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></svg>';retry.onclick=()=>location.reload();loading.append(retry);}
-function aimCamera(){const distance=overview?180:38;camera.position.set(focus.x+Math.sin(angle)*distance,distance*31/38+focus.y,focus.z+Math.cos(angle)*distance);camera.lookAt(focus);sun.position.set(focus.x-16,28+focus.y,focus.z+12);sun.target.position.copy(focus);scene.fog=overview?mapFog:walkingFog;}
-function updateCamera(){const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height,half=(overview?Math.max(76,82/aspect):13)/zoom;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;aimCamera();camera.updateProjectionMatrix();renderer.setSize(rect.width,rect.height,false);}
+function aimCamera(){const distance=overview?260:38;camera.position.set(focus.x+Math.sin(angle)*distance,distance*31/38+focus.y,focus.z+Math.cos(angle)*distance);camera.lookAt(focus);sun.position.set(focus.x-16,28+focus.y,focus.z+12);sun.target.position.copy(focus);scene.fog=overview?mapFog:walkingFog;}
+function updateCamera(){const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height,half=(overview?Math.max(132,145/aspect):13)/zoom;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;aimCamera();camera.updateProjectionMatrix();renderer.setSize(rect.width,rect.height,false);}
 new ResizeObserver(updateCamera).observe(canvas);
 $('rotate').onclick=()=>{angle+=Math.PI/6;updateCamera();};
 $('zoom-in').onclick=()=>{zoom=Math.min(1.6,zoom+.15);updateCamera();};
@@ -203,8 +217,16 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   const onBridge=BRIDGE_X.some(x=>Math.abs(player.root.position.x-x)<2)&&Math.abs(riverDistance)<4.5;
   const bridgeHeight=onBridge?.1+.7*Math.sin((riverDistance+4.5)/9*Math.PI):0;
   player.root.position.y=Math.max(terrainHeight(player.root.position.x,player.root.position.z),bridgeHeight);
-  if(!overview){focus.lerp(new T.Vector3(player.root.position.x,player.root.position.y,player.root.position.z-1),1-Math.exp(-dt*4));aimCamera();}
-  animateLandscape(ms);
+  if(viewing&&(dx||dz||overview)){viewing=false;zoom=1;updateCamera();}
+  if(viewing){focus.lerp(new T.Vector3(shrine.x,terrainHeight(shrine.x,shrine.z)+3,shrine.z),1-Math.exp(-dt*4));aimCamera();}
+  else if(!overview){focus.lerp(new T.Vector3(player.root.position.x,player.root.position.y,player.root.position.z-1),1-Math.exp(-dt*4));aimCamera();}
+  const nearBell=Math.hypot(player.root.position.x-bell.x,player.root.position.z-bell.z)<6;
+  const nearStatue=Math.hypot(player.root.position.x-shrine.x,player.root.position.z-shrine.z)<7;
+  const {x,z}=player.root.position;
+  const byChime=near(chime,x,z,1.65),byShelter=near(shelter,x,z,4.5);
+  const action=$('greet'),label=byChime?'풍경 건드리기':byShelter?(rest.listening?'계곡 소리 끄기':'계곡 소리 듣기'):nearBell?'범종 울리기':nearStatue?'불상 감상 전환':'가까운 주민에게 인사하기';
+  if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z');}
+  rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
   villagers.forEach(({actor,home,kind})=>{
     const phase=ms*.00035+kind*1.7;

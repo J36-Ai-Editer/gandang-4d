@@ -47,6 +47,8 @@ export function expandLandscape(scene:T.Scene) {
     const m=new T.Mesh(g,material('#dfc89e'));m.receiveShadow=true;root.add(m);
   }
   trail([[0,28],[-7,36],[-24,39],[-41,28],[-46,11],[-44,-8],[-39,-32],[-22,-39],[3,-35],[26,-39],[43,-28],[47,-6],[45,18],[34,37],[15,45],[0,28]],3.2);
+  trail([[3,-35],[8,-48],[2,-58],[-7,-68],[-2,-72],[10,-77],[24,-72],[37,-57],[26,-39]],3.4);
+  trail([[-41,28],[-67,42],[-81,65],[-55,83],[-12,87],[42,78],[79,55],[63,32],[45,18]],3);
   trail([[0,3],[-2,-10],[0,riverCenter(0)],[3,-35]],4.2);
   trail([[-25,3],[-27,-8],[-25,riverCenter(-25)],[-22,-39]],3.6);
   trail([[25,6],[27,-8],[25,riverCenter(25)],[26,-39]],3.6);
@@ -59,7 +61,7 @@ export function expandLandscape(scene:T.Scene) {
   function riverStrip(width:number,y:number,mat:T.Material){
     const v:number[]=[],ix:number[]=[];
     for(let i=0;i<=150;i++){
-      const x=-88+i/150*176,center=riverCenter(x);
+      const x=-116+i/150*232,center=riverCenter(x);
       const half=width/6*riverHalfWidth(x);v.push(x,y,center-half,x,y,center+half);
       if(i<150){const n=i*2;ix.push(n,n+1,n+2,n+1,n+3,n+2);}
     }
@@ -198,10 +200,10 @@ export function expandLandscape(scene:T.Scene) {
     g.computeVertexNormals();const m=add(g,color,x,h/2-.5,z);m.rotation.y=random()*6.28;return m;
   }
   for(let i=0;i<18;i++){
-    const x=-90+i*10.5,z=-78+Math.sin(i*1.8)*8;
+    const x=-90+i*10.5,z=-130+Math.sin(i*1.8)*8;
     peak(x,z,12+random()*15,10+random()*5,i%2?'#aeb9a3':'#bbc6b6');
   }
-  for(const [x,z,h] of [[-70,-38,28],[-77,0,22],[-71,34,19],[72,-48,30],[79,-12,24],[73,32,22]])peak(x,z,h,9,'#8a9991');
+  for(const [x,z,h] of [[-70,-38,28],[-77,0,22],[-71,34,19],[72,-48,30],[79,-12,24],[73,32,22]])peak(x*1.68,z,h,9,'#8a9991');
   // A high cascade is a visible landmark from the orchard, with a return trail around its foot.
   const cascade=new T.Group();cascade.position.set(-48,0,-34);root.add(cascade);
   for(let i=0;i<8;i++){

@@ -1,6 +1,6 @@
 export type Position = { x:number; z:number };
 export type Obstacle = { x:number; z:number; width:number; depth:number };
-export const WORLD_LIMIT=64;
+export const WORLD_LIMIT=104;
 export const BRIDGE_X=[-25,0,25];
 export function riverCenter(x:number):number{return -22+3.6*Math.sin(x*.08)+1.2*Math.sin(x*.19);}
 export function riverHalfWidth(x:number):number{return 3+.55*Math.sin(x*.1)+.28*Math.sin(x*.27);}
@@ -9,13 +9,13 @@ const smooth=(a:number,b:number,v:number)=>{const t=Math.max(0,Math.min(1,(v-a)/
 export function terrainHeight(x:number,z:number):number {
   const outskirts=smooth(0,1,Math.max((Math.abs(x)-30)/18,(Math.abs(z)-33)/16));
   const hill=(cx:number,cz:number,h:number,r:number)=>h*Math.exp(-((x-cx)**2+(z-cz)**2)/(r*r));
-  const height=hill(-47,16,5.6,18)+hill(43,36,7,21)+hill(18,-48,5,17)+hill(-38,-46,4.5,19);
+  const height=hill(10,-82,14,28)+hill(-75,62,10,35)+hill(80,54,12,33)+hill(-47,16,5.6,18)+hill(43,36,7,21)+hill(18,-48,5,17)+hill(-38,-46,4.5,19);
   return outskirts*height*smooth(riverHalfWidth(x)+.7,riverHalfWidth(x)+10,Math.abs(z-riverCenter(x)));
 }
 export const GROVE_TREES:Array<{x:number;z:number;scale:number;peach:boolean}>=[];
 let groveSeed=7235;
 const groveRand=()=>{groveSeed=(groveSeed*1664525+1013904223)>>>0;return groveSeed/4294967296;};
-for(const [cx,cz] of [[-47,8],[-38,35],[-16,50],[22,47],[48,25],[49,-7],[35,-45],[-22,-46],[-50,-39]]){
+for(const [cx,cz] of [[-62,52],[-77,71],[-40,83],[34,86],[76,62],[82,44],[-18,-80],[28,-88],[-47,8],[-38,35],[-16,50],[22,47],[48,25],[49,-7],[35,-45],[-22,-46],[-50,-39]]){
   for(let i=0;i<11;i++){
     const a=groveRand()*Math.PI*2,r=3+groveRand()*8,x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r;
     if(Math.abs(z-riverCenter(x))<5||GROVE_TREES.some(t=>Math.hypot(t.x-x,t.z-z)<2.5))continue;
@@ -28,7 +28,7 @@ export const BUILDINGS:Obstacle[] = [
   {x:-5,z:-14,width:6,depth:4},
 ];
 export const EXPANSION_BUILDINGS:Obstacle[]=[
-  {x:-25,z:15,width:6.6,depth:5.3},{x:25,z:17,width:6.6,depth:5.3},
+  {x:10,z:-82,width:5.2,depth:5.2},{x:-1,z:-76,width:3.6,depth:2.8},{x:-25,z:15,width:6.6,depth:5.3},{x:25,z:17,width:6.6,depth:5.3},
   {x:-16,z:-32,width:6.6,depth:5.3},{x:15,z:-32,width:6.6,depth:5.3},
   {x:-18,z:3,width:4,depth:2},{x:-24,z:3,width:4,depth:2},{x:19,z:6,width:4,depth:2},
   {x:-17,z:10,width:3,depth:3},{x:18,z:14,width:3,depth:2},
