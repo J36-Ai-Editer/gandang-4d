@@ -1,3 +1,5 @@
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {legSwing} from './locomotion.ts';
 import {buildForest,forestActions} from './forest.ts';
 import {FOREST_ENTRY,forestStop} from './world3d.ts';
 import {buildWetland,wetlandActions} from './wetland.ts';
@@ -100,7 +102,35 @@ function hanok(x:number,z:number,w:number,d:number){const root=new T.Group();roo
   }
   return root;
 }
-for(const b of BUILDINGS)hanok(b.x,b.z,b.width,b.depth);
+BUILDINGS.forEach((b,index)=>{
+  const fallback=hanok(b.x,b.z,b.width,b.depth);
+  if(index!==0)return;
+  fallback.userData.dynamic=true;
+  const modelUrl=new URL('assets/hanok-anchae.glb',document.baseURI).href;
+  void new GLTFLoader().loadAsync(modelUrl).then(({scene:model})=>{
+    const bounds=new T.Box3().setFromObject(model);
+    const size=bounds.getSize(new T.Vector3()),center=bounds.getCenter(new T.Vector3());
+    const scale=Math.min(b.width/size.x,b.depth/size.z);
+    model.scale.setScalar(scale);
+    model.position.set(b.x-center.x*scale,-bounds.min.y*scale,b.z-center.z*scale);
+    model.traverse(part=>{
+      if(!(part instanceof T.Mesh))return;
+      part.castShadow=true;part.receiveShadow=true;
+      const name=part.name+' '+(part.parent?.name??'');
+      if(/anchae-(roof|ridge|caps)/.test(name)){
+        const shades=Array.isArray(part.material)?part.material:[part.material];
+        for(const surface of shades){
+          if(surface instanceof T.MeshStandardMaterial){
+            surface.color.lerp(new T.Color('#52616c'),.82);
+            surface.roughness=.86;surface.metalness=0;
+          }
+        }
+      }
+    });
+    scene.add(model);fallback.visible=false;
+    canvas.dataset.hanok='anchae';
+  }).catch(()=>{canvas.dataset.hanok='fallback';});
+});
 // Pond: shaped basin, rock edge, water lilies and a pavilion.
 const pond=new T.Group();pond.position.set(7,0,-5);scene.add(pond);
 const basin=cylinder(5.2,5.2,.15,'#c2c5ad',pond,0,.02,0,64);basin.scale.z=.82;
@@ -172,14 +202,36 @@ function zodiac(kind:number){
   if(kind===4){for(let i=0;i<3;i++)ball(.12,'#d4ba6e',actor.root,0,2.13,-.3+i*.16,.7,1.5,1);}
   if(kind===5){const tail=mesh(new T.TorusGeometry(.35,.1,8,16,Math.PI*1.6),fur,actor.root,0,.36,-.38);tail.rotation.x=Math.PI/2;}
   if(kind===6)for(let i=0;i<5;i++)ball(.13,'#665649',actor.root,0,2.04,-.25+i*.12,.7,1,1);
+  if(kind===0||kind===8){
+    const tail=new T.CatmullRomCurve3([new T.Vector3(0,.64,-.32),new T.Vector3(.26,.46,-.58),new T.Vector3(.46,.65,-.74),new T.Vector3(.38,.9,-.8)]);
+    mesh(new T.TubeGeometry(tail,16,.047,8,false),fur,actor.root);
+  }
+  if(kind===7)for(let i=0;i<8;i++){
+    const angle=i*Math.PI/4;
+    ball(.148,'#e9d8bc',actor.root,Math.cos(angle)*.31,1.96+Math.sin(angle)*.12,-.12,.93,1,.8);
+  }
+  if(kind===10)for(const side of [-1,1]){
+    const ear=ball(.17,'#927154',actor.root,side*.44,1.84,-.04,.78,1.6,.62);
+    ear.rotation.z=side*.43;
+  }
+  if(kind===11){
+    ball(.145,'#d99294',actor.root,0,1.55,.53,1.18,.72,.48);
+    for(const side of [-1,1])ball(.028,'#a66669',actor.root,side*.058,1.56,.595,.8,1,.4);
+  }
   return actor;
 }
 const homes=[[-4,3],[4,3],[-19,9],[1,8],[4,-31],[-2,-5],[-28,7],[24,-11],[7,29],[-3,27],[27,-30],[-8,-29]];
+const destinations=[[0,7],[10,10],[-14,12],[2,15],[8,-35],[-2,-10],[-31,13],[27,-6],[13,32],[-8,31],[32,-34],[-12,-35]];
 const villagers=homes.map(([x,z],kind)=>{
- const actor=zodiac(kind),home={x,z};actor.root.position.set(x,0,z);actor.root.rotation.y=kind*.8;
- return {actor,home,kind};
+ const actor=zodiac(kind),home={x,z};
+ const [tx,tz]=destinations[kind];
+ const outward=findRoute(home,{x:tx,z:tz});
+ const path=[home,...outward];
+ actor.root.position.set(x,terrainHeight(x,z),z);
+ actor.root.rotation.y=kind*.8;
+ return {actor,kind,path,distanceWalked:0,index:0,direction:1,waitUntil:kind*620,greetUntil:0};
 });
-let greetingUntil=0;
+
 $('greet').onclick=()=>{
  const {x,z}=player.root.position;
  if(forest.interact({x,z},performance.now())||wetland.interact({x,z})){waveAt=performance.now();return;}
@@ -189,7 +241,8 @@ $('greet').onclick=()=>{
  if(Math.hypot(x-shrine.x,z-shrine.z)<7){viewing=!viewing;overview=false;zoom=viewing?2.4:1;updateCamera();return;}
  const nearest=[...villagers].sort((a,b)=>a.actor.root.position.distanceTo(player.root.position)-b.actor.root.position.distanceTo(player.root.position))[0];
  if(nearest.actor.root.position.distanceTo(player.root.position)>4){message('가까운 주민에게 다가가 주세요.');return;}
- greetingUntil=performance.now()+1800;
+ nearest.greetUntil=performance.now()+1800;
+ waveAt=performance.now();
  nearest.actor.root.rotation.y=Math.atan2(player.root.position.x-nearest.actor.root.position.x,player.root.position.z-nearest.actor.root.position.z);
  nearest.actor.arms[0].rotation.z=-2;
 };
@@ -247,11 +300,41 @@ for(let i=0;i<6;i++){
   const band=mesh(new T.TorusGeometry(.47+i*.041,.009,6,44),i%2?'#c99759':'#eac883',playerModel,0,2.075,0);
   band.rotation.x=Math.PI/2;
 }
-let seated=false,jumpAt=-1000,waveAt=-1000;
-function jump(){if(performance.now()-jumpAt>=630){seated=false;jumpAt=performance.now();}}
-function sit(){seated=!seated;route=[];marker.visible=false;}
+const alternateHair=new T.Group();playerModel.add(alternateHair);
+ball(.24,'#44362c',alternateHair,0,1.78,-.39,.85,1.22,.9);
+ball(.16,'#44362c',alternateHair,0,1.57,-.43,.62,1.7,.8);
+ball(.08,'#c77270',alternateHair,0,1.45,-.43,1,.55,.85);
+const skirt=cylinder(.31,.51,.62,'#c67983',playerModel,0,.68,0,24);
+const clothes=[player.body,...player.arms.map(arm=>arm.children[0])];
+const robes=['#518ca5','#cf8793','#879664','#ac845f'];
+let feminine=false,robeIndex=0;
+function dress(){
+  alternateHair.visible=feminine;skirt.visible=feminine;
+  const outfit=mat(robes[(robeIndex+(feminine?1:0))%robes.length]);
+  for(const part of [...clothes,skirt])if(part instanceof T.Mesh)part.material=outfit;
+  canvas.dataset.avatar=feminine?'feminine':'masculine';
+  canvas.dataset.outfit=outfit.color.getHexString();
+  $('avatar-style').setAttribute('aria-pressed',String(feminine));
+}
+$('avatar-style').onclick=()=>{feminine=!feminine;dress();};
+$('outfit').onclick=()=>{robeIndex=(robeIndex+1)%robes.length;dress();};
+dress();
+const seats=[
+  {x:shelter.x,z:shelter.z-1.45,height:.67},
+  {x:-2.5,z:10,height:.52}
+];
+const bench=seats[1];
+box(1.85,.14,.53,palette.trim,scene,bench.x,.45,bench.z);
+for(const side of [-1,1])box(.16,.4,.38,palette.wood,scene,bench.x+side*.66,.2,bench.z);
+box(1.85,.25,.1,palette.wood,scene,bench.x,.8,bench.z-.24);
+let seated:typeof bench|undefined,departedSeat:typeof bench|undefined;
+let jumpAt=-1000,waveAt=-1000;
+function stand(){
+  if(seated)departedSeat=seated;
+  seated=undefined;
+}
+function jump(){if(performance.now()-jumpAt>=630){stand();jumpAt=performance.now();}}
 $('jump').onclick=jump;
-$('sit').onclick=sit;
 const guide=person('#c7889d');guide.root.position.set(2,0,1);guide.root.rotation.y=-.4;
 const marker=mesh(new T.RingGeometry(.22,.29,28),'#fff4cd');marker.rotation.x=-Math.PI/2;marker.position.y=.07;marker.visible=false;marker.castShadow=false;
 marker.userData.dynamic=true;
@@ -276,7 +359,6 @@ const vectors:Record<string,[number,number]>={w:[0,-1],arrowup:[0,-1],s:[0,1],ar
 window.addEventListener('keydown',e=>{
   if(!e.repeat&&!e.target?.toString().includes('Button')){
     if(e.code==='Space'){e.preventDefault();jump();}
-    if(e.code==='KeyC')sit();
   }
   if(vectors[e.key.toLowerCase()]){e.preventDefault();pressed.add(e.key.toLowerCase());route=[];marker.visible=false;}});
 window.addEventListener('keyup',e=>pressed.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>pressed.clear());
@@ -292,12 +374,23 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   for(const key of pressed){const [x,z]=vectors[key];dx+=x*Math.cos(angle)+z*Math.sin(angle);dz+=-x*Math.sin(angle)+z*Math.cos(angle);}
   if(!pressed.size&&route.length){const p=route[0],dist=Math.hypot(p.x-player.root.position.x,p.z-player.root.position.z);if(dist<.12)route.shift();else{dx=(p.x-player.root.position.x)/dist;dz=(p.z-player.root.position.z)/dist;}}
   const length=Math.hypot(dx,dz);moving=false;
-  if(length){seated=false;dx/=length;dz/=length;const p=player.root.position,nx=p.x+dx*(movingSpeed())*dt,nz=p.z+dz*(movingSpeed())*dt;if(canWalk({x:nx,z:p.z})){p.x=nx;moving=true;}if(canWalk({x:p.x,z:nz})){p.z=nz;moving=true;}player.root.rotation.y=Math.atan2(dx,dz);}
+  if(length){stand();dx/=length;dz/=length;const p=player.root.position,nx=p.x+dx*(movingSpeed())*dt,nz=p.z+dz*(movingSpeed())*dt;if(canWalk({x:nx,z:p.z})){p.x=nx;moving=true;}if(canWalk({x:p.x,z:nz})){p.z=nz;moving=true;}player.root.rotation.y=Math.atan2(dx,dz);}
   const jumpProgress=Math.min(1,Math.max(0,(ms-jumpAt)/630));
   const airborne=Math.sin(jumpProgress*Math.PI);
-  playerModel.position.y=airborne*.98-(seated?.34:0);
+  const position=player.root.position;
+  if(departedSeat&&Math.hypot(position.x-departedSeat.x,position.z-departedSeat.z)>1.1)departedSeat=undefined;
+  if(!posing&&!seated&&!length&&!pressed.size&&!route.length&&jumpProgress===1){
+    seated=seats.find(seat=>seat!==departedSeat&&Math.hypot(position.x-seat.x,position.z-seat.z)<.85);
+    if(seated){
+      position.x=seated.x;position.z=seated.z;
+      player.root.rotation.y=0;marker.visible=false;
+    }
+  }
+  canvas.dataset.seated=String(!!seated);
+  skirt.rotation.x=seated?-0.37:0;
+  playerModel.position.y=seated?seated.height-.52:airborne*.98;
   player.legs.forEach((leg,i)=>{
-    leg.rotation.x=seated?-1.35:airborne*-.43+(moving?Math.sin(ms*.014+i*Math.PI)*.58:0);
+    leg.rotation.x=seated?-1.35:airborne*-.43+(moving?legSwing(ms/1000,running,i/2)*.58:0);
     knees[i].rotation.x=seated?1.3:airborne*.65;
   });
   const waving=ms-waveAt<1000;
@@ -307,7 +400,6 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
     elbows[i].rotation.z=waving&&i===1?1+.23*Math.sin(ms*.031):0;
     if(waving&&i===1&&!posing)arm.rotation.z=1.26;
   });
-  $('sit').setAttribute('aria-pressed',String(seated));
   player.body.position.y=.86+(moving?Math.abs(Math.sin(ms*.012))*.035:0);
   // Camera follows the walker, so the added districts are explorable instead of off-screen decoration.
   const riverDistance=player.root.position.z-riverCenter(player.root.position.x);
@@ -327,15 +419,32 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',wetlandAction?.icon??(byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z'));}
   forest.update(ms);wetland.update(ms);rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
-  villagers.forEach(({actor,home,kind})=>{
-    const phase=ms*.00035+kind*1.7;
-    const target={x:home.x+Math.sin(phase)*.65,z:home.z+Math.cos(phase)*.45};
-    const walking=canWalk(target);
-    if(walking){actor.root.position.set(target.x,0,target.z);actor.root.rotation.y=Math.atan2(Math.cos(phase)*.65,-Math.sin(phase)*.45);}
-    actor.legs.forEach((leg,i)=>leg.rotation.x=walking?Math.sin(ms*.004+kind+i*Math.PI)*.18:0);
-    actor.root.position.y=terrainHeight(target.x,target.z)+Math.sin(ms*.0015+kind)*.018;
-    if(ms>greetingUntil)actor.arms[0].rotation.z=0;
-  });
+  for(const villager of villagers){
+    const {actor,kind,path}=villager;
+    const position=actor.root.position;
+    const target=path[villager.index+villager.direction];
+    let walking=false;
+    if(target&&ms>=Math.max(villager.waitUntil,villager.greetUntil)){
+      const dx=target.x-position.x,dz=target.z-position.z,distance=Math.hypot(dx,dz);
+      const step=dt*(.85+kind%3*.13);
+      if(distance<=step){
+        position.x=target.x;position.z=target.z;villager.index+=villager.direction;
+        if(villager.index===0||villager.index===path.length-1){
+          villager.direction*=-1;villager.waitUntil=ms+2100+kind%4*700;
+        }
+      }else{
+        position.x+=dx/distance*step;position.z+=dz/distance*step;
+        const heading=Math.atan2(dx,dz),difference=heading-actor.root.rotation.y;
+        actor.root.rotation.y+=Math.atan2(Math.sin(difference),Math.cos(difference))*Math.min(1,dt*9);
+        villager.distanceWalked+=step;
+        walking=true;
+      }
+    }
+    actor.legs.forEach((leg,i)=>leg.rotation.x=walking?legSwing(ms/1000,false,i/2)*.29:0);
+    actor.root.position.y=terrainHeight(position.x,position.z);
+    if(ms>villager.greetUntil)actor.arms[0].rotation.z=0;
+  }
+  canvas.dataset.villagersWalked=String(villagers.filter(v=>v.distanceWalked>.25).length);
   petals.children.forEach((petal,i)=>{petal.position.y-=dt*.25;petal.position.x+=Math.sin(ms*.0004+i)*dt*.15;petal.rotation.z+=dt*.5;if(petal.position.y<.12)petal.position.y=7;});
   ripples.forEach((ring,i)=>{ring.scale.setScalar(1+((ms*.00025+i*.25)%1)*1.5);});
   if(!route.length)marker.visible=false;
