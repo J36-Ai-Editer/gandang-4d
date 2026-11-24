@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canWalk,findRoute,riverCenter,riverHalfWidth,terrainHeight,GROVE_TREES,WETLAND_POOL,WETLAND_STOPS,wetlandStop} from './world3d.ts';
+import {canWalk,findRoute,riverCenter,riverHalfWidth,terrainHeight,GROVE_TREES,WETLAND_POOL,WETLAND_STOPS,wetlandStop,FOREST_ENTRY,FOREST_STOPS,forestStop} from './world3d.ts';
 test('3D village blocks buildings, water and boundary while keeping plaza open',()=>{
   assert.equal(canWalk({x:0,z:4}),true);
   for(const p of [{x:-7,z:-4},{x:8,z:6},{x:7,z:-5},{x:105,z:0},{x:NaN,z:0}])assert.equal(canWalk(p),false);
@@ -33,3 +33,4 @@ test('click route goes around a solid hanok footprint',()=>{
 test('temple forecourt allows viewing while protecting the sculpture',()=>{assert.ok(canWalk({x:10,z:-77}));assert.equal(canWalk({x:10,z:-82}),false);assert.ok(terrainHeight(10,-77)>10);});
 test('the waterfall shelter approach is reachable from the village',()=>{assert.ok(findRoute({x:0,z:5},{x:-40,z:-32}).length);});
 test('wetland discoveries are individually reachable and the pool is blocked',()=>{ const village={x:0,z:5}; let previous=village; for(const [key,stop] of Object.entries(WETLAND_STOPS)){assert.equal(wetlandStop(stop),key);assert.ok(findRoute(previous,stop).length);previous=stop;}assert.ok(findRoute(previous,village).length);assert.equal(canWalk(WETLAND_POOL),false);});
+test('wetland links to both forest discoveries and back',()=>{ assert.ok(findRoute(WETLAND_STOPS.crane,FOREST_ENTRY).length); for(const [key,stop] of Object.entries(FOREST_STOPS)){assert.equal(forestStop(stop),key);assert.ok(findRoute(FOREST_ENTRY,stop).length);assert.ok(findRoute(stop,WETLAND_STOPS.crane).length);} });

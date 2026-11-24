@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import {GROVE_TREES,riverCenter,riverHalfWidth,terrainHeight} from './world3d.ts';
+import {FOREST_TRAIL,GROVE_TREES,riverCenter,riverHalfWidth,terrainHeight} from './world3d.ts';
 
 /** Original scene geometry. The shared PNGs are art references, never fake GLB conversions. */
 export function expandLandscape(scene:T.Scene) {
@@ -50,6 +50,7 @@ export function expandLandscape(scene:T.Scene) {
   trail([[3,-35],[8,-48],[2,-58],[-7,-68],[-2,-72],[10,-77],[24,-72],[37,-57],[26,-39]],3.4);
   trail([[-41,28],[-67,42],[-81,65],[-55,83],[-12,87],[42,78],[79,55],[63,32],[45,18]],3);
   trail([[26,-39],[36,-39],[48,-42],[56,-41],[62,-39],[70,-39],[76,-49],[74,-58],[63,-58],[52,-54],[48,-42]],2.85);
+  trail(FOREST_TRAIL,2.65);
   trail([[0,3],[-2,-10],[0,riverCenter(0)],[3,-35]],4.2);
   trail([[-25,3],[-27,-8],[-25,riverCenter(-25)],[-22,-39]],3.6);
   trail([[25,6],[27,-8],[25,riverCenter(25)],[26,-39]],3.6);

@@ -1,3 +1,5 @@
+import {buildForest,forestActions} from './forest.ts';
+import {FOREST_ENTRY,forestStop} from './world3d.ts';
 import {buildWetland,wetlandActions} from './wetland.ts';
 import {WETLAND_ENTRY,wetlandStop} from './world3d.ts';
 import {buildShelter,shelter,chime} from './shelter.ts';
@@ -131,6 +133,7 @@ for(let i=0;i<8;i++){const stone=ball(.34,'#c6bea6',scene,-.7+Math.sin(i)*.32,.0
 const retreat=buildRetreat(scene);
 const rest=buildShelter(scene);
 const wetland=buildWetland(scene);
+const forest=buildForest(scene);
 const near=(point:Position,x:number,z:number,r:number)=>Math.hypot(point.x-x,point.z-z)<r;
 let viewing=false;
 const animateLandscape=expandLandscape(scene);
@@ -179,7 +182,7 @@ const villagers=homes.map(([x,z],kind)=>{
 let greetingUntil=0;
 $('greet').onclick=()=>{
  const {x,z}=player.root.position;
- if(wetland.interact({x,z})){waveAt=performance.now();return;}
+ if(forest.interact({x,z},performance.now())||wetland.interact({x,z})){waveAt=performance.now();return;}
  if(near(chime,x,z,1.65)){rest.ring();return;}
  if(near(shelter,x,z,4.5)){rest.toggle();return;}
  if(retreat.interact(x,z))return;
@@ -207,7 +210,7 @@ const ripples:Array<T.Mesh>=[];
 for(let i=0;i<4;i++){const ring=mesh(new T.RingGeometry(.45,.47,40),'#b4e3d5',pond,-2+i*1.2,.16,-1+i*.4);ring.userData.dynamic=true;ring.rotation.x=-Math.PI/2;ring.castShadow=false;ripples.push(ring);}
 const player=person('#518ca5');
 const visit=new URLSearchParams(location.search).get('visit');
-const arrival=visit==='wetland'?WETLAND_ENTRY:visit==='valley'?{x:shelter.x,z:shelter.z+3}:visit==='statue'?{x:shrine.x,z:shrine.z+5}:{x:0,z:5};
+const arrival=visit==='forest'?FOREST_ENTRY:visit==='wetland'?WETLAND_ENTRY:visit==='valley'?{x:shelter.x,z:shelter.z+3}:visit==='statue'?{x:shrine.x,z:shrine.z+5}:{x:0,z:5};
 player.root.position.set(arrival.x,terrainHeight(arrival.x,arrival.z),arrival.z);
 // A small straw hat and its woven rim identify the player without adding instructional text.
 cylinder(.71,.74,.055,'#dfbc72',player.root,0,2.04,0,32);
@@ -318,10 +321,11 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   const nearStatue=Math.hypot(player.root.position.x-shrine.x,player.root.position.z-shrine.z)<7;
   const {x,z}=player.root.position;
   const byChime=near(chime,x,z,1.65),byShelter=near(shelter,x,z,4.5);
-  const stop=wetlandStop({x,z}),wetlandAction=stop?wetlandActions[stop]:undefined;
+  const forestKey=forestStop({x,z}),stop=wetlandStop({x,z});
+  const wetlandAction=forestKey?forestActions[forestKey]:stop?wetlandActions[stop]:undefined;
   const action=$('greet'),label=wetlandAction?.label??(byChime?'풍경 건드리기':byShelter?(rest.listening?'계곡 소리 끄기':'계곡 소리 듣기'):nearBell?'범종 울리기':nearStatue?'불상 감상 전환':'가까운 주민에게 인사하기');
   if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',wetlandAction?.icon??(byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z'));}
-  wetland.update(ms);rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
+  forest.update(ms);wetland.update(ms);rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
   villagers.forEach(({actor,home,kind})=>{
     const phase=ms*.00035+kind*1.7;

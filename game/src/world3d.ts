@@ -10,6 +10,13 @@ export function wetlandStop(p:Position){
 function wetlandRadius(x:number,z:number){
   return Math.hypot((x-WETLAND_POOL.x)/WETLAND_POOL.rx,(z-WETLAND_POOL.z)/WETLAND_POOL.rz);
 }
+export const FOREST_TRAIL=[[74,-58],[76,-65],[72,-72],[65,-75],[61,-82],[67,-87],[76,-87],[83,-79],[83,-67],[76,-61]];
+export const FOREST_ENTRY={x:76,z:-65};
+export const FOREST_STOPS={deer:{x:63,z:-79},herb:{x:76,z:-87}} as const;
+export function forestStop(point:Position){
+  return (Object.keys(FOREST_STOPS) as Array<keyof typeof FOREST_STOPS>).find(key=>
+    Math.hypot(point.x-FOREST_STOPS[key].x,point.z-FOREST_STOPS[key].z)<2.85);
+}
 export const WORLD_LIMIT=104;
 export const BRIDGE_X=[-25,0,25];
 export function riverCenter(x:number):number{return -22+3.6*Math.sin(x*.08)+1.2*Math.sin(x*.19);}
@@ -19,7 +26,7 @@ const smooth=(a:number,b:number,v:number)=>{const t=Math.max(0,Math.min(1,(v-a)/
 export function terrainHeight(x:number,z:number):number {
   const outskirts=smooth(0,1,Math.max((Math.abs(x)-30)/18,(Math.abs(z)-33)/16));
   const hill=(cx:number,cz:number,h:number,r:number)=>h*Math.exp(-((x-cx)**2+(z-cz)**2)/(r*r));
-  const height=hill(10,-82,14,28)+hill(-75,62,10,35)+hill(80,54,12,33)+hill(-47,16,5.6,18)+hill(43,36,7,21)+hill(18,-48,5,17)+hill(-38,-46,4.5,19);
+  const height=hill(74,-96,10,23)+hill(10,-82,14,28)+hill(-75,62,10,35)+hill(80,54,12,33)+hill(-47,16,5.6,18)+hill(43,36,7,21)+hill(18,-48,5,17)+hill(-38,-46,4.5,19);
   if(wetlandRadius(x,z)<1)return -.2*(1-wetlandRadius(x,z));
   return outskirts*height*smooth(riverHalfWidth(x)+.7,riverHalfWidth(x)+10,Math.abs(z-riverCenter(x)));
 }
@@ -31,6 +38,14 @@ for(const [cx,cz] of [[-62,52],[-77,71],[-40,83],[34,86],[76,62],[82,44],[-18,-8
     const a=groveRand()*Math.PI*2,r=3+groveRand()*8,x=cx+Math.cos(a)*r,z=cz+Math.sin(a)*r;
     if(Math.abs(z-riverCenter(x))<5||GROVE_TREES.some(t=>Math.hypot(t.x-x,t.z-z)<2.5))continue;
     GROVE_TREES.push({x,z,scale:.8+groveRand()*.6,peach:i%4!==0});
+  }
+}
+for(const [cx,cz] of [[59,-70],[84,-70],[87,-89],[58,-91],[70,-96],[94,-80]]){
+  for(let i=0;i<8;i++){
+    const angle=groveRand()*6.283,radius=1.6+groveRand()*6;
+    const x=cx+Math.cos(angle)*radius,z=cz+Math.sin(angle)*radius;
+    if(FOREST_TRAIL.some(([tx,tz])=>Math.hypot(x-tx,z-tz)<5)||GROVE_TREES.some(tree=>Math.hypot(x-tree.x,z-tree.z)<2.4))continue;
+    GROVE_TREES.push({x,z,scale:1+groveRand()*.8,peach:false});
   }
 }
 export const BUILDINGS:Obstacle[] = [
