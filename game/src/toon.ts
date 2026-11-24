@@ -1,3 +1,4 @@
+import {connectPineWind} from './forest-assets.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {legSwing} from './locomotion.ts';
 import {buildForest,forestActions} from './forest.ts';
@@ -316,8 +317,8 @@ function dress(){
   canvas.dataset.outfit=outfit.color.getHexString();
   $('avatar-style').setAttribute('aria-pressed',String(feminine));
 }
-$('avatar-style').onclick=()=>{feminine=!feminine;dress();};
-$('outfit').onclick=()=>{robeIndex=(robeIndex+1)%robes.length;dress();};
+$('avatar-style').onclick=()=>{if(canChangeClothes()){feminine=!feminine;dress();}};
+$('outfit').onclick=()=>{if(canChangeClothes()){robeIndex=(robeIndex+1)%robes.length;dress();}};
 dress();
 const seats=[
   {x:shelter.x,z:shelter.z-1.45,height:.67},
@@ -334,14 +335,18 @@ function stand(){
   seated=undefined;
 }
 function jump(){if(performance.now()-jumpAt>=630){stand();jumpAt=performance.now();}}
-$('jump').onclick=jump;
 const guide=person('#c7889d');guide.root.position.set(2,0,1);guide.root.rotation.y=-.4;
+function canChangeClothes(){
+  const {x,z}=player.root.position;
+  return !overview&&near(guide.root.position,x,z,2.65);
+}
 const marker=mesh(new T.RingGeometry(.22,.29,28),'#fff4cd');marker.rotation.x=-Math.PI/2;marker.position.y=.07;marker.visible=false;marker.castShadow=false;
 marker.userData.dynamic=true;
 let route:Position[]=[],angle=.42,zoom=1,moving=false;
 let overview=false;
 const focus=player.root.position.clone();
-connectVillageAudio($<HTMLButtonElement>('sound'));
+const soundButton=$<HTMLButtonElement>('sound');
+const wind=connectPineWind(soundButton,connectVillageAudio(soundButton));
 const pressed=new Set<string>();
 function message(_text:string){document.querySelector('.stage')?.classList.remove('invalid');requestAnimationFrame(()=>document.querySelector('.stage')?.classList.add('invalid'));}
 function showError(description:string){const loading=$('loading');loading.hidden=false;loading.classList.add('error');loading.setAttribute('aria-label',description);const retry=document.createElement('button');retry.setAttribute('aria-label','다시 불러오기');retry.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></svg>';retry.onclick=()=>location.reload();loading.append(retry);}
@@ -409,6 +414,12 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   if(viewing&&(dx||dz||overview)){viewing=false;zoom=1;updateCamera();}
   if(viewing){focus.lerp(new T.Vector3(shrine.x,terrainHeight(shrine.x,shrine.z)+3,shrine.z),1-Math.exp(-dt*4));aimCamera();}
   else if(!overview){focus.lerp(new T.Vector3(player.root.position.x,player.root.position.y,player.root.position.z-1),1-Math.exp(-dt*4));aimCamera();}
+  const wardrobe=$('wardrobe');
+  const showWardrobe=canChangeClothes();
+  if(wardrobe.hidden===showWardrobe){
+    if(!showWardrobe&&wardrobe.contains(document.activeElement))canvas.focus();
+    wardrobe.hidden=!showWardrobe;
+  }
   const nearBell=Math.hypot(player.root.position.x-bell.x,player.root.position.z-bell.z)<6;
   const nearStatue=Math.hypot(player.root.position.x-shrine.x,player.root.position.z-shrine.z)<7;
   const {x,z}=player.root.position;
@@ -417,6 +428,7 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   const wetlandAction=forestKey?forestActions[forestKey]:stop?wetlandActions[stop]:undefined;
   const action=$('greet'),label=wetlandAction?.label??(byChime?'풍경 건드리기':byShelter?(rest.listening?'계곡 소리 끄기':'계곡 소리 듣기'):nearBell?'범종 울리기':nearStatue?'불상 감상 전환':'가까운 주민에게 인사하기');
   if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',wetlandAction?.icon??(byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z'));}
+  canvas.dataset.pineWind=wind(x,z).toFixed(2);
   forest.update(ms);wetland.update(ms);rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
   for(const villager of villagers){

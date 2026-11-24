@@ -11,6 +11,17 @@ function wetlandRadius(x:number,z:number){
   return Math.hypot((x-WETLAND_POOL.x)/WETLAND_POOL.rx,(z-WETLAND_POOL.z)/WETLAND_POOL.rz);
 }
 export const FOREST_TRAIL=[[74,-58],[76,-65],[72,-72],[65,-75],[61,-82],[67,-87],[76,-87],[83,-79],[83,-67],[76,-61]];
+export const FOREST_ROCKS=[
+  {x:78,z:-69,height:.66},{x:69,z:-66,height:.78},{x:68,z:-79,height:.68},
+  {x:61,z:-87,height:.92},{x:73,z:-92,height:.9},{x:86,z:-83,height:.72}
+];
+function nearForestTrail(x:number,z:number){
+  return FOREST_TRAIL.slice(1).some(([bx,bz],i)=>{
+    const [ax,az]=FOREST_TRAIL[i],dx=bx-ax,dz=bz-az;
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));
+    return Math.hypot(x-ax-t*dx,z-az-t*dz)<3.7;
+  });
+}
 export const FOREST_ENTRY={x:76,z:-65};
 export const FOREST_STOPS={deer:{x:63,z:-79},herb:{x:76,z:-87}} as const;
 export function forestStop(point:Position){
@@ -44,7 +55,7 @@ for(const [cx,cz] of [[59,-70],[84,-70],[87,-89],[58,-91],[70,-96],[94,-80]]){
   for(let i=0;i<8;i++){
     const angle=groveRand()*6.283,radius=1.6+groveRand()*6;
     const x=cx+Math.cos(angle)*radius,z=cz+Math.sin(angle)*radius;
-    if(FOREST_TRAIL.some(([tx,tz])=>Math.hypot(x-tx,z-tz)<5)||GROVE_TREES.some(tree=>Math.hypot(x-tree.x,z-tree.z)<2.4))continue;
+    if(nearForestTrail(x,z)||GROVE_TREES.some(tree=>Math.hypot(x-tree.x,z-tree.z)<2.4))continue;
     GROVE_TREES.push({x,z,scale:1+groveRand()*.8,peach:false});
   }
 }
@@ -62,6 +73,7 @@ export const EXPANSION_BUILDINGS:Obstacle[]=[
 export function canWalk(p:Position):boolean {
   if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.abs(p.x)>WORLD_LIMIT||Math.abs(p.z)>WORLD_LIMIT)return false;
   if(Math.abs(p.z-riverCenter(p.x))<riverHalfWidth(p.x)+.2&&!BRIDGE_X.some(x=>Math.abs(p.x-x)<1.55))return false;
+  if(FOREST_ROCKS.some(rock=>Math.hypot(rock.x-p.x,rock.z-p.z)<rock.height*.8))return false;
   if(wetlandRadius(p.x,p.z)<1.01)return false;
   if(Math.hypot(p.x+48,p.z+34)<4.5)return false;
   if(GROVE_TREES.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<.65))return false;

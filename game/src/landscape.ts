@@ -1,7 +1,8 @@
+import {loadForestProps,type ForestProp} from './forest-assets.ts';
 import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import {FOREST_TRAIL,GROVE_TREES,riverCenter,riverHalfWidth,terrainHeight} from './world3d.ts';
+import {FOREST_ROCKS,FOREST_TRAIL,GROVE_TREES,riverCenter,riverHalfWidth,terrainHeight} from './world3d.ts';
 
 /** Original scene geometry. The shared PNGs are art references, never fake GLB conversions. */
 export function expandLandscape(scene:T.Scene) {
@@ -99,6 +100,7 @@ export function expandLandscape(scene:T.Scene) {
       leaf.castShadow=true;
     }
     for(let i=0;i<7;i++){const a=i*.9;const stone=sphere(.26,'#879660',Math.cos(a)*.65,.08,Math.sin(a)*.65,1,.3,.8,tree);stone.castShadow=false;}
+    return tree;
   }
   // Rounded thatch strands, grain baskets and paper lattice doors, matching the reference silhouette.
   function cottage(x:number,z:number,rotation=0){
@@ -179,7 +181,18 @@ export function expandLandscape(scene:T.Scene) {
   for(const z of [-.65,.65])cube(4,.07,.08,'#a1764b',1,.8,z,cart);
   for(let i=0;i<6;i++)cube(.28,.36,1.55,'#99724d',-1.15+i*.45,1.05,0,cart);
   // Broad forest loop, with views kept clear at the crossings and village entrance.
-  for(const t of GROVE_TREES)pine(t.x,t.z,t.scale,t.peach);
+  const importedPines:ForestProp[]=[];
+  for(const tree of GROVE_TREES){
+    const fallback=pine(tree.x,tree.z,tree.scale,tree.peach);
+    if(!tree.peach&&tree.x>54&&tree.z< -63){
+      fallback.userData.dynamic=true;
+      importedPines.push({x:tree.x,z:tree.z,height:tree.scale*3.55,fallback});
+    }
+  }
+  const canvas=document.querySelector<HTMLCanvasElement>('#world3d')!;
+  void loadForestProps(root,importedPines,FOREST_ROCKS).then(([pines,rocks])=>{
+    canvas.dataset.forestProps=pines+','+rocks;
+  }).catch(()=>{canvas.dataset.forestProps='partial';});
   for(const [x,z] of [[-18,18],[-29,10],[30,11],[-10,24],[13,25],[-31,-12],[31,-12],[-8,-32],[7,-34]])pine(x,z,1.15,true);
   for(let i=0;i<190;i++){
     const a=random()*Math.PI*2,r=29+random()*7,x=Math.sin(a)*r,z=Math.cos(a)*r;
