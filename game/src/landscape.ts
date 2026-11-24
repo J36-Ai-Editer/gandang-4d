@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {GROVE_TREES,riverCenter,riverHalfWidth,terrainHeight} from './world3d.ts';
 
 /** Original scene geometry. The shared PNGs are art references, never fake GLB conversions. */
 export function expandLandscape(scene:T.Scene) {
@@ -26,44 +27,71 @@ export function expandLandscape(scene:T.Scene) {
     const texture=new T.CanvasTexture(canvas);texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.repeat.set(18,18);texture.colorSpace=T.SRGBColorSpace;
     return texture;
   }
-  const ground=new T.Mesh(new T.PlaneGeometry(180,180),new T.MeshStandardMaterial({map:groundTexture('#a6b77b','#536b42'),roughness:1}));
-  ground.rotation.x=-Math.PI/2;ground.position.y=-.045;ground.receiveShadow=true;root.add(ground);
+  const terrain=new T.PlaneGeometry(360,360,192,192);terrain.rotateX(-Math.PI/2);
+  const heights=terrain.getAttribute('position');
+  for(let i=0;i<heights.count;i++)heights.setY(i,terrainHeight(heights.getX(i),heights.getZ(i))-.045);
+  terrain.computeVertexNormals();
+  const ground=new T.Mesh(terrain,new T.MeshStandardMaterial({map:groundTexture('#a6b77b','#536b42'),roughness:1}));
+  ground.receiveShadow=true;root.add(ground);
   function road(x:number,z:number,w:number,d:number){const m=cube(w,.035,d,'#dfc89e',x,.003,z);m.castShadow=false;return m;}
-  road(0,17,6,30); road(-23,3,40,4);road(23,6,38,4);road(0,-30,60,5);road(-25,-11,4,32);road(25,-9,4,35);
+  road(0,17,6,30);road(-18,3,25,4);road(18,6,25,4);
+  function trail(points:number[][],width:number){
+    const curve=new T.CatmullRomCurve3(points.map(([x,z])=>new T.Vector3(x,0,z)));
+    const vertices:number[]=[],indices:number[]=[];
+    for(let i=0;i<=140;i++){
+      const t=i/140,p=curve.getPoint(t),tangent=curve.getTangent(t),w=width*(.94+.1*Math.sin(t*23));
+      for(const side of [-1,1]){const x=p.x-side*tangent.z*w/2,z=p.z+side*tangent.x*w/2;vertices.push(x,terrainHeight(x,z)+.008,z);}
+      if(i<140){const n=i*2;indices.push(n,n+1,n+2,n+1,n+3,n+2);}
+    }
+    const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setIndex(indices);g.computeVertexNormals();
+    const m=new T.Mesh(g,material('#dfc89e'));m.receiveShadow=true;root.add(m);
+  }
+  trail([[0,28],[-7,36],[-24,39],[-41,28],[-46,11],[-44,-8],[-39,-32],[-22,-39],[3,-35],[26,-39],[43,-28],[47,-6],[45,18],[34,37],[15,45],[0,28]],3.2);
+  trail([[0,3],[-2,-10],[0,riverCenter(0)],[3,-35]],4.2);
+  trail([[-25,3],[-27,-8],[-25,riverCenter(-25)],[-22,-39]],3.6);
+  trail([[25,6],[27,-8],[25,riverCenter(25)],[26,-39]],3.6);
   for(let row=0;row<7;row++)for(let col=0;col<7;col++){
     const tile=cube(.77,.055,.57,['#c7bea3','#d3c7aa','#dbceb1'][(row+col)%3],(col-3)*.9+(row%2)*.35,.05,5+(row-3)*.7);
     tile.rotation.y=(random()-.5)*.09; tile.castShadow=false;
   }
   // A river across the north, with three truly walkable bridge crossings.
-  road(0,-22,94,7.5);
   const riverMaterial=new T.MeshStandardMaterial({color:'#64bcb2',roughness:.24,metalness:.12});
-  const river=new T.Mesh(new T.PlaneGeometry(94,6),riverMaterial);river.rotation.x=-Math.PI/2;river.position.set(0,.06,-22);river.receiveShadow=true;root.add(river);
-  for(let i=0;i<112;i++)for(const side of [-1,1]){
-    const x=-46+i*.83;
-    sphere(.28+random()*.2,i%4?'#b8b9a0':'#959f86',x,.05,-22+side*(3.3+random()*.25),1,.65,.85);
+  function riverStrip(width:number,y:number,mat:T.Material){
+    const v:number[]=[],ix:number[]=[];
+    for(let i=0;i<=150;i++){
+      const x=-88+i/150*176,center=riverCenter(x);
+      const half=width/6*riverHalfWidth(x);v.push(x,y,center-half,x,y,center+half);
+      if(i<150){const n=i*2;ix.push(n,n+1,n+2,n+1,n+3,n+2);}
+    }
+    const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(v,3));g.setIndex(ix);g.computeVertexNormals();const m=new T.Mesh(g,mat);m.receiveShadow=true;root.add(m);
+  }
+  riverStrip(7.2,.025,material('#cfbd99'));riverStrip(6,.06,riverMaterial);
+  for(let i=0;i<160;i++)for(const side of [-1,1]){
+    const x=-68+i*.85;
+    sphere(.23+random()*.25,i%4?'#b8b9a0':'#959f86',x,.08,riverCenter(x)+side*(riverHalfWidth(x)+.3+random()*.25),1,.65,.85);
   }
   const waterMarks=new T.Group();waterMarks.userData.dynamic=true;root.add(waterMarks);
   for(let i=0;i<32;i++){
     const m=new T.Mesh(new T.PlaneGeometry(.5+random()*1.6,.035),new T.MeshBasicMaterial({color:'#d5ecce',transparent:true,opacity:.4}));
-    m.rotation.x=-Math.PI/2;m.position.set(-44+random()*88,.075,-24.5+random()*5);waterMarks.add(m);
+    const x=-60+random()*120;m.rotation.x=-Math.PI/2;m.position.set(x,.075,riverCenter(x)+(random()-.5)*riverHalfWidth(x)*1.6);waterMarks.add(m);
   }
   function bridge(x:number){
     for(let i=0;i<16;i++){
-      const z=-25.4+i*.45,y=.1+Math.sin(i/15*Math.PI)*.7;
-      cube(4,.22,.44,i%3?'#cbc4ad':'#d7cdb6',x,y,z);
+      const z=riverCenter(x)-4.5+i*.6,y=.1+Math.sin(i/15*Math.PI)*.7;
+      cube(4,.22,.59,i%3?'#cbc4ad':'#d7cdb6',x,y,z);
       for(const side of [-1,1]){
         if(i%3===0){cube(.22,.9,.23,'#aead99',x+side*1.85,y+.55,z);sphere(.2,'#c4c1aa',x+side*1.85,y+1.1,z);}
-        cube(.16,.15,.53,'#b3b39c',x+side*1.85,y+.8,z);
+        cube(.16,.15,.66,'#b3b39c',x+side*1.85,y+.8,z);
       }
     }
   }
   for(const x of [-25,0,25])bridge(x);
   function pine(x:number,z:number,s=1,cherry=false){
-    const tree=new T.Group();tree.position.set(x,0,z);tree.scale.setScalar(s);root.add(tree);
+    const tree=new T.Group();tree.position.set(x,terrainHeight(x,z),z);tree.scale.setScalar(s);root.add(tree);
     const trunk=pole(.22,3.3,'#806044',0,1.6,0,tree);trunk.rotation.z=.12;
     for(let i=0;i<22;i++){
       const a=i*2.399,r=.4+random()*1.4;
-      const leaf=sphere(.72+random()*.45,cherry?['#efb9bf','#f6d2ce','#dd9eae'][i%3]:['#829e57','#92ad64','#637e48'][i%3],Math.cos(a)*r,3+random()*1.7,Math.sin(a)*r,1,.68,1,tree);
+      const leaf=sphere(.72+random()*.45,cherry?['#f7b7c7','#f4d0cd','#e99ab2'][i%3]:['#829e57','#92ad64','#637e48'][i%3],Math.cos(a)*r,3+random()*1.7,Math.sin(a)*r,1,.68,1,tree);
       leaf.castShadow=true;
     }
     for(let i=0;i<7;i++){const a=i*.9;const stone=sphere(.26,'#879660',Math.cos(a)*.65,.08,Math.sin(a)*.65,1,.3,.8,tree);stone.castShadow=false;}
@@ -147,10 +175,7 @@ export function expandLandscape(scene:T.Scene) {
   for(const z of [-.65,.65])cube(4,.07,.08,'#a1764b',1,.8,z,cart);
   for(let i=0;i<6;i++)cube(.28,.36,1.55,'#99724d',-1.15+i*.45,1.05,0,cart);
   // Broad forest loop, with views kept clear at the crossings and village entrance.
-  for(let i=0;i<65;i++){
-    const a=i/65*Math.PI*2,x=Math.sin(a)*39,z=Math.cos(a)*38;
-    pine(x,z,.8+random()*.65,i%5===0);
-  }
+  for(const t of GROVE_TREES)pine(t.x,t.z,t.scale,t.peach);
   for(const [x,z] of [[-18,18],[-29,10],[30,11],[-10,24],[13,25],[-31,-12],[31,-12],[-8,-32],[7,-34]])pine(x,z,1.15,true);
   for(let i=0;i<190;i++){
     const a=random()*Math.PI*2,r=29+random()*7,x=Math.sin(a)*r,z=Math.cos(a)*r;
@@ -163,12 +188,45 @@ export function expandLandscape(scene:T.Scene) {
       }
     }
   }
-  // Layered mountain silhouettes fill the horizon without pretending the walkable map is infinite.
-  for(let i=0;i<20;i++){
-    const a=i/20*Math.PI*2,r=62+random()*13;
-    sphere(6+random()*5,i%2?'#9eaf8a':'#b2bd9d',Math.sin(a)*r,1,Math.cos(a)*r,1.6,1.2,1.3);
+  // Irregular rock stacks and receding ridges, with an open southern valley instead of a circular wall.
+  function peak(x:number,z:number,h:number,r:number,color:string){
+    const g=new T.ConeGeometry(r,h,9,7);const p=g.getAttribute('position');
+    for(let i=0;i<p.count;i++){
+      const y=p.getY(i),a=Math.atan2(p.getZ(i),p.getX(i)),jitter=1+.13*Math.sin(a*3+y*.43)+.07*Math.cos(y*1.3-a*2);
+      p.setX(i,p.getX(i)*jitter+.8*Math.sin(y*.15));p.setZ(i,p.getZ(i)*jitter); 
+    }
+    g.computeVertexNormals();const m=add(g,color,x,h/2-.5,z);m.rotation.y=random()*6.28;return m;
   }
-  return (ms:number)=>waterMarks.children.forEach((m,i)=>{m.position.x+=Math.sin(ms*.0003+i)*.002;});
+  for(let i=0;i<18;i++){
+    const x=-90+i*10.5,z=-78+Math.sin(i*1.8)*8;
+    peak(x,z,12+random()*15,10+random()*5,i%2?'#aeb9a3':'#bbc6b6');
+  }
+  for(const [x,z,h] of [[-70,-38,28],[-77,0,22],[-71,34,19],[72,-48,30],[79,-12,24],[73,32,22]])peak(x,z,h,9,'#8a9991');
+  // A high cascade is a visible landmark from the orchard, with a return trail around its foot.
+  const cascade=new T.Group();cascade.position.set(-48,0,-34);root.add(cascade);
+  for(let i=0;i<8;i++){
+    const rock=sphere(1.7,['#8a8177','#69756f','#89917e'][i%3],-2.5+(i%3)*2.4,2+Math.floor(i/3)*3,-1+Math.sin(i)*1.2,1,2.1,.8,cascade);rock.rotation.z=(random()-.5)*.22;
+  }
+  const fallsMaterial=new T.MeshStandardMaterial({color:'#c9e6de',roughness:.22,transparent:true,opacity:.82,side:T.DoubleSide});
+  const falls=new T.Mesh(new T.PlaneGeometry(2.2,10),fallsMaterial);falls.position.set(.2,5.05,2.75);cascade.add(falls);
+  for(let i=0;i<13;i++){
+    const line=new T.Mesh(new T.PlaneGeometry(.02+random()*.09,5+random()*3),new T.MeshBasicMaterial({color:'#f3f5e7',transparent:true,opacity:.5}));line.position.set(-.8+i*.14,4.6,2.77);cascade.add(line);
+  }
+  const pool=add(new T.CylinderGeometry(3.1,3.1,.05,40),'#74b9ac',-47.5,.08,-31);pool.castShadow=false;
+  trail([[-40,-35],[-42,-28],[-39,-19]],2.5);
+  const mist=new T.Group();mist.userData.dynamic=true;root.add(mist);
+  const cloudMat=new T.MeshBasicMaterial({color:'#ede9e3',transparent:true,opacity:.12,depthWrite:false});
+  for(let i=0;i<16;i++){
+    const cloud=new T.Mesh(new T.SphereGeometry(1,10,7),cloudMat);
+    cloud.position.set(-53+random()*12,1+random()*2,-35+random()*8);cloud.scale.set(2+random()*3,.45+random()*.6,1.6);mist.add(cloud);
+  }
+  for(let i=0;i<10;i++){
+    const cloud=new T.Mesh(new T.SphereGeometry(1,10,6),cloudMat);cloud.position.set(-66+i*15,8+Math.sin(i)*2,-57+Math.cos(i)*4);cloud.scale.set(8,.9,2.5);mist.add(cloud);
+  }
+  return (ms:number)=>{
+    waterMarks.children.forEach((m,i)=>{m.position.x+=Math.sin(ms*.0003+i)*.002;});
+    mist.children.forEach((m,i)=>{m.position.x+=Math.sin(ms*.00012+i)*.0015;});
+  };
 }
 
 /** Batch static meshes while retaining interactive actors, particles and their transforms. */

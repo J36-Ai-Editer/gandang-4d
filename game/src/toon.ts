@@ -1,13 +1,13 @@
 import * as T from 'three';
 import './toon.css';
-import {BUILDINGS, canWalk, findRoute, type Position} from './world3d.ts';
+import {BUILDINGS,BRIDGE_X,canWalk,findRoute,riverCenter,terrainHeight,type Position} from './world3d.ts';
 import {expandLandscape,batchStaticLandscape} from './landscape.ts';
 import {connectVillageAudio} from './village-audio.ts';
 
 const $ = <E extends HTMLElement>(id:string)=>document.getElementById(id) as E;
 const canvas=$<HTMLCanvasElement>('world3d');
 const scene=new T.Scene();scene.background=new T.Color('#dce4cb');
-scene.fog=new T.Fog('#dce4cb',65,130);
+const walkingFog=new T.Fog('#dce4cb',80,180),mapFog=new T.Fog('#dce4cb',230,440);scene.fog=walkingFog;
 let renderer:T.WebGLRenderer;
 try{renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});}
 catch{ showError('WebGL 2를 사용할 수 없습니다. 브라우저의 그래픽 가속 설정을 확인해 주세요.');throw new Error('WebGL 2 unavailable'); }
@@ -15,7 +15,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
 renderer.outputColorSpace=T.SRGBColorSpace;
 renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
-const camera=new T.OrthographicCamera(-20,20,12,-12,.1,160);
+const camera=new T.OrthographicCamera(-20,20,12,-12,.1,600);
 const sun=new T.DirectionalLight('#fff1d2',2.4);sun.position.set(-16,28,12);sun.castShadow=true;
 sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});
 sun.shadow.normalBias=.035;sun.shadow.bias=-.0002;sun.shadow.radius=3;
@@ -29,7 +29,7 @@ function ball(r:number,color:string,parent:T.Object3D,x=0,y=0,z=0,sx=1,sy=1,sz=1
 function cylinder(rt:number,rb:number,h:number,color:string,parent:T.Object3D,x=0,y=0,z=0,segments=12){return mesh(new T.CylinderGeometry(rt,rb,h,segments),color,parent,x,y,z);}
 function beam(a:T.Vector3,b:T.Vector3,r:number,color:string,parent:T.Object3D){const m=cylinder(r,r,a.distanceTo(b),color,parent);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),b.clone().sub(a).normalize());return m;}
 function path(points:number[][],width:number,color=palette.sand){const curve=new T.CatmullRomCurve3(points.map(([x,z])=>new T.Vector3(x,.035,z)));const samples=curve.getPoints(70),v:number[]=[],indices:number[]=[];samples.forEach((p,i)=>{const tangent=curve.getTangent(i/(samples.length-1));const dx=-tangent.z*width/2,dz=tangent.x*width/2;v.push(p.x+dx,p.y,p.z+dz,p.x-dx,p.y,p.z-dz);if(i<samples.length-1){const n=i*2;indices.push(n,n+2,n+1,n+1,n+2,n+3);}});const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(v,3));g.setIndex(indices);g.computeVertexNormals();const m=mesh(g,color);m.castShadow=false;}
-box(180,.25,180,palette.grass,scene,0,-.2,0);
+box(400,.25,400,palette.grass,scene,0,-.2,0);
 // An open continuous landscape, with a broad readable meeting space.
 cylinder(6.8,6.8,.045,palette.sand,scene,0,.025,3,64);
 path([[0,19],[0,10],[0,3],[-.8,-5],[0,-17]],5.2);
@@ -77,7 +77,7 @@ roof(4.4,4.4,3.3,pavilion);cylinder(.55,.55,.15,palette.wood,pavilion,0,1.1,0);
 
 function tree(x:number,z:number,cherry=false,scale=1){const root=new T.Group();root.position.set(x,0,z);root.scale.setScalar(scale);scene.add(root);beam(new T.Vector3(0,0,0),new T.Vector3(.25,3.2,0),.19,palette.wood,root);for(let i=0;i<7;i++){const a=i*2.4,px=Math.cos(a)*1.25,pz=Math.sin(a)*1.1;beam(new T.Vector3(.12,1.8,0),new T.Vector3(px,3.1,pz),.1,palette.wood,root);for(let j=0;j<5;j++){const b=j*2.4;ball(.53+rand()*.25,cherry?['#edb8c3','#f5cbd0','#dfa5b5'][j%3]:['#789952','#8da963','#62874c'][j%3],root,px+Math.cos(b)*.56,3.3+(i%2)*.42+rand()*.5,pz+Math.sin(b)*.5,1,.8,1);}}return root;}
 tree(-12,3,true,1.2);tree(-10,11,true,1.2);tree(12,-11,false,1.35);tree(13,11,true,1.3);
-for(let i=0;i<18;i++){const a=i/18*Math.PI*2;tree(Math.sin(a)*25,Math.cos(a)*24,i%4===0,1.3+rand()*.6);}
+for(const [x,z] of [[-22,-10],[-31,-3],[-18,23],[20,25],[30,12],[25,-12],[-5,31]])tree(x,z,true,1.1+rand()*.5);
 // Walls and flower beds are made from individual stones and stems.
 function wall(x:number,z:number,length:number,rotation=0){const root=new T.Group();root.position.set(x,0,z);root.rotation.y=rotation;scene.add(root);for(let i=0;i<Math.floor(length/.7);i++){for(let r=0;r<2;r++){const block=box(.66,.33,.45,r%2?'#b8b7a2':'#a9af9b',root,-length/2+i*.7+(r%2)*.15,.2+r*.32,0);block.rotation.z=(rand()-.5)*.04;}}box(length,.12,.6,palette.roof,root,-.2,.91,0);}
 wall(-12,-3,6,Math.PI/2);wall(-8,9,5);wall(12,7,6,Math.PI/2);wall(-6,-9,7);
@@ -174,8 +174,8 @@ connectVillageAudio($<HTMLButtonElement>('sound'));
 const pressed=new Set<string>();
 function message(_text:string){document.querySelector('.stage')?.classList.remove('invalid');requestAnimationFrame(()=>document.querySelector('.stage')?.classList.add('invalid'));}
 function showError(description:string){const loading=$('loading');loading.hidden=false;loading.classList.add('error');loading.setAttribute('aria-label',description);const retry=document.createElement('button');retry.setAttribute('aria-label','다시 불러오기');retry.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></svg>';retry.onclick=()=>location.reload();loading.append(retry);}
-function aimCamera(){camera.position.set(focus.x+Math.sin(angle)*38,31,focus.z+Math.cos(angle)*38);camera.lookAt(focus.x,0,focus.z);sun.position.set(focus.x-16,28,focus.z+12);sun.target.position.set(focus.x,0,focus.z);}
-function updateCamera(){const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height,half=(overview?Math.max(49,54/aspect):13)/zoom;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;aimCamera();camera.updateProjectionMatrix();renderer.setSize(rect.width,rect.height,false);}
+function aimCamera(){const distance=overview?180:38;camera.position.set(focus.x+Math.sin(angle)*distance,distance*31/38+focus.y,focus.z+Math.cos(angle)*distance);camera.lookAt(focus);sun.position.set(focus.x-16,28+focus.y,focus.z+12);sun.target.position.copy(focus);scene.fog=overview?mapFog:walkingFog;}
+function updateCamera(){const rect=canvas.getBoundingClientRect(),aspect=rect.width/rect.height,half=(overview?Math.max(76,82/aspect):13)/zoom;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;aimCamera();camera.updateProjectionMatrix();renderer.setSize(rect.width,rect.height,false);}
 new ResizeObserver(updateCamera).observe(canvas);
 $('rotate').onclick=()=>{angle+=Math.PI/6;updateCamera();};
 $('zoom-in').onclick=()=>{zoom=Math.min(1.6,zoom+.15);updateCamera();};
@@ -183,7 +183,7 @@ $('zoom-out').onclick=()=>{zoom=Math.max(.7,zoom-.15);updateCamera();};
 $('reset-view').onclick=()=>{overview=false;angle=.42;zoom=1;updateCamera();$('map-view').setAttribute('aria-pressed','false');};
 $('map-view').onclick=()=>{overview=!overview;zoom=1;focus.set(overview?0:player.root.position.x,0,overview?-3:player.root.position.z);$('map-view').setAttribute('aria-pressed',String(overview));updateCamera();};
 const raycaster=new T.Raycaster(),pointer=new T.Vector2(),plane=new T.Plane(new T.Vector3(0,1,0),0);
-canvas.onpointerdown=e=>{canvas.focus();const rect=canvas.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);const hit=raycaster.ray.intersectPlane(plane,new T.Vector3());if(!hit)return;route=findRoute(player.root.position,{x:hit.x,z:hit.z});if(route.length){marker.position.set(hit.x,.07,hit.z);marker.visible=true;}else message('건물과 연못을 피해 빈 땅을 눌러 주세요.');};
+canvas.onpointerdown=e=>{canvas.focus();const rect=canvas.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);plane.constant=0;const hit=raycaster.ray.intersectPlane(plane,new T.Vector3());if(!hit)return;for(let i=0;i<5;i++){plane.constant=-terrainHeight(hit.x,hit.z);if(!raycaster.ray.intersectPlane(plane,hit))return;}route=findRoute(player.root.position,{x:hit.x,z:hit.z});if(route.length){marker.position.set(hit.x,terrainHeight(hit.x,hit.z)+.07,hit.z);marker.visible=true;}else message('건물과 연못을 피해 빈 땅을 눌러 주세요.');};
 const vectors:Record<string,[number,number]>={w:[0,-1],arrowup:[0,-1],s:[0,1],arrowdown:[0,1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
 window.addEventListener('keydown',e=>{if(vectors[e.key.toLowerCase()]){e.preventDefault();pressed.add(e.key.toLowerCase());route=[];marker.visible=false;}});
 window.addEventListener('keyup',e=>pressed.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>pressed.clear());
@@ -199,9 +199,11 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   player.arms.forEach((arm,i)=>arm.rotation.x=moving?-Math.sin(ms*.012+i*Math.PI)*.4:0);
   player.body.position.y=.86+(moving?Math.abs(Math.sin(ms*.012))*.035:0);
   // Camera follows the walker, so the added districts are explorable instead of off-screen decoration.
-  if(!overview){focus.lerp(new T.Vector3(player.root.position.x,0,player.root.position.z-1),1-Math.exp(-dt*4));aimCamera();}
-  const bridgeHeight=player.root.position.z>-25.5&&player.root.position.z<-18.5?.72*Math.sin((player.root.position.z+25.5)/7*Math.PI):0;
-  player.root.position.y=Math.max(0,bridgeHeight);
+  const riverDistance=player.root.position.z-riverCenter(player.root.position.x);
+  const onBridge=BRIDGE_X.some(x=>Math.abs(player.root.position.x-x)<2)&&Math.abs(riverDistance)<4.5;
+  const bridgeHeight=onBridge?.1+.7*Math.sin((riverDistance+4.5)/9*Math.PI):0;
+  player.root.position.y=Math.max(terrainHeight(player.root.position.x,player.root.position.z),bridgeHeight);
+  if(!overview){focus.lerp(new T.Vector3(player.root.position.x,player.root.position.y,player.root.position.z-1),1-Math.exp(-dt*4));aimCamera();}
   animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
   villagers.forEach(({actor,home,kind})=>{
@@ -210,7 +212,7 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
     const walking=canWalk(target);
     if(walking){actor.root.position.set(target.x,0,target.z);actor.root.rotation.y=Math.atan2(Math.cos(phase)*.65,-Math.sin(phase)*.45);}
     actor.legs.forEach((leg,i)=>leg.rotation.x=walking?Math.sin(ms*.004+kind+i*Math.PI)*.18:0);
-    actor.root.position.y=Math.sin(ms*.0015+kind)*.018;
+    actor.root.position.y=terrainHeight(target.x,target.z)+Math.sin(ms*.0015+kind)*.018;
     if(ms>greetingUntil)actor.arms[0].rotation.z=0;
   });
   petals.children.forEach((petal,i)=>{petal.position.y-=dt*.25;petal.position.x+=Math.sin(ms*.0004+i)*dt*.15;petal.rotation.z+=dt*.5;if(petal.position.y<.12)petal.position.y=7;});
