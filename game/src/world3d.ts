@@ -1,5 +1,15 @@
 export type Position = { x:number; z:number };
 export type Obstacle = { x:number; z:number; width:number; depth:number };
+export const WETLAND_POOL={x:63,z:-48,rx:10,rz:7};
+export const WETLAND_ENTRY={x:48,z:-42};
+export const WETLAND_STOPS={water:{x:56,z:-41},turtle:{x:70,z:-39},crane:{x:76,z:-49}} as const;
+export function wetlandStop(p:Position){
+  const stops=Object.keys(WETLAND_STOPS) as Array<keyof typeof WETLAND_STOPS>;
+  return stops.find(key=>Math.hypot(p.x-WETLAND_STOPS[key].x,p.z-WETLAND_STOPS[key].z)<3.1);
+}
+function wetlandRadius(x:number,z:number){
+  return Math.hypot((x-WETLAND_POOL.x)/WETLAND_POOL.rx,(z-WETLAND_POOL.z)/WETLAND_POOL.rz);
+}
 export const WORLD_LIMIT=104;
 export const BRIDGE_X=[-25,0,25];
 export function riverCenter(x:number):number{return -22+3.6*Math.sin(x*.08)+1.2*Math.sin(x*.19);}
@@ -10,6 +20,7 @@ export function terrainHeight(x:number,z:number):number {
   const outskirts=smooth(0,1,Math.max((Math.abs(x)-30)/18,(Math.abs(z)-33)/16));
   const hill=(cx:number,cz:number,h:number,r:number)=>h*Math.exp(-((x-cx)**2+(z-cz)**2)/(r*r));
   const height=hill(10,-82,14,28)+hill(-75,62,10,35)+hill(80,54,12,33)+hill(-47,16,5.6,18)+hill(43,36,7,21)+hill(18,-48,5,17)+hill(-38,-46,4.5,19);
+  if(wetlandRadius(x,z)<1)return -.2*(1-wetlandRadius(x,z));
   return outskirts*height*smooth(riverHalfWidth(x)+.7,riverHalfWidth(x)+10,Math.abs(z-riverCenter(x)));
 }
 export const GROVE_TREES:Array<{x:number;z:number;scale:number;peach:boolean}>=[];
@@ -36,6 +47,7 @@ export const EXPANSION_BUILDINGS:Obstacle[]=[
 export function canWalk(p:Position):boolean {
   if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.abs(p.x)>WORLD_LIMIT||Math.abs(p.z)>WORLD_LIMIT)return false;
   if(Math.abs(p.z-riverCenter(p.x))<riverHalfWidth(p.x)+.2&&!BRIDGE_X.some(x=>Math.abs(p.x-x)<1.55))return false;
+  if(wetlandRadius(p.x,p.z)<1.01)return false;
   if(Math.hypot(p.x+48,p.z+34)<4.5)return false;
   if(GROVE_TREES.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<.65))return false;
   if(((p.x-7)/5.4)**2+((p.z+5)/4.5)**2<1)return false;

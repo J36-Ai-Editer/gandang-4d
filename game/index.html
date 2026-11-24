@@ -16,6 +16,11 @@
 <button data-move="d" aria-label="오른쪽으로 이동"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>
 </nav>
 <button id="greet" class="greet" aria-label="가까운 주민에게 인사하기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z"/></svg></button>
+<nav class="pose-tools" aria-label="캐릭터 동작">
+<button id="jump" aria-label="뛰어오르기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V4m-5 5 5-5 5 5M5 21h14"/></svg></button>
+<button id="sit" aria-label="앉기 또는 일어서기" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 9v6h7v6m-7-6H6m1 0v6"/><circle cx="11" cy="5" r="2"/></svg></button>
+</nav>
+<output id="wetland-status" aria-live="polite"></output>
 <div id="loading" role="status" aria-label="마을 불러오는 중"><span class="spinner" aria-hidden="true"></span></div>
 <output id="position" class="sr-only" aria-live="off"></output>
 </main><script type="module" src="/src/toon.ts"></script></body></html>

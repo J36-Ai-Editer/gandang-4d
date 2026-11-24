@@ -1,3 +1,5 @@
+import {buildWetland,wetlandActions} from './wetland.ts';
+import {WETLAND_ENTRY,wetlandStop} from './world3d.ts';
 import {buildShelter,shelter,chime} from './shelter.ts';
 import * as T from 'three';
 import './toon.css';
@@ -42,12 +44,26 @@ function rand(){randomSeed=(randomSeed*1664525+1013904223)>>>0;return randomSeed
 function roof(w:number,d:number,y:number,parent:T.Object3D){
   // Curved eaves are actual geometry; ribs follow the same curved profile.
   const profile=(t:number)=>y+1.35*(1-Math.abs(t))+.5*Math.abs(t)**4;
+  const rise=(x:number,t:number)=>.38*(Math.abs(x)/(w/2))**5*Math.abs(t)**2;
   const vertices:number[]=[],indices:number[]=[],segments=20;
-  for(let side=0;side<2;side++)for(let i=0;i<=segments;i++){const t=-1+2*i/segments;vertices.push((side?1:-1)*w/2,profile(t),t*d/2);}
-  for(let i=0;i<segments;i++){const a=i,b=i+segments+1;indices.push(a,b,a+1,b,b+1,a+1);}
+  const columns=20;
+  for(let col=0;col<=columns;col++)for(let i=0;i<=segments;i++){
+    const x=(col/columns-.5)*w,t=-1+2*i/segments;
+    vertices.push(x,profile(t)+rise(x,t),t*d/2);
+    if(col<columns&&i<segments){
+      const a=col*(segments+1)+i,b=a+segments+1;
+      indices.push(a,a+1,b,b,a+1,b+1);
+    }
+  }
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setIndex(indices);g.computeVertexNormals();const surface=mesh(g,palette.roof,parent);(surface.material as T.Material).side=T.DoubleSide;
-  for(let x=-w/2;x<=w/2+.01;x+=.31){const points:Array<T.Vector3>=[];for(let i=0;i<=16;i++){const t=-1+i/8;points.push(new T.Vector3(x,profile(t)+.045,t*d/2));}mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),24,.075,5,false),palette.tile,parent);}
-  for(const z of [-d/2,d/2])beam(new T.Vector3(-w/2,y+.49,z),new T.Vector3(w/2,y+.49,z),.12,palette.trim,parent);
+  for(let x=-w/2;x<=w/2+.01;x+=.31){const points:Array<T.Vector3>=[];for(let i=0;i<=16;i++){const t=-1+i/8;points.push(new T.Vector3(x,profile(t)+rise(x,t)+.045,t*d/2));}mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),24,.075,5,false),palette.tile,parent);}
+  for(const z of [-d/2,d/2]){
+    const points=Array.from({length:17},(_,i)=>{
+      const x=(i/16-.5)*w;
+      return new T.Vector3(x,y+.49+rise(x,1),z);
+    });
+    mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),28,.085,8,false),palette.trim,parent);
+  }
   beam(new T.Vector3(-w/2-.12,y+1.43,0),new T.Vector3(w/2+.12,y+1.43,0),.16,palette.roof,parent);
   for(const side of [-1,1])ball(.22,palette.tile,parent,side*w/2,y+1.48,0,.7,1.3,1);
 }
@@ -61,7 +77,25 @@ function hanok(x:number,z:number,w:number,d:number){const root=new T.Group();roo
   box(w+.4,.2,1.1,palette.trim,root,0,.53,d/2+.45);
   box(2,.15,.5,'#c0bca6',root,0,.25,d/2+1.05);box(2.2,.13,.45,'#cac4ac',root,0,.09,d/2+1.45);
   roof(w+1.25,d+1.5,3.25,root);
+  for(let i=0;i<Math.floor(w/.26);i++){
+    const px=-w/2+.15+i*.26;
+    box(.12,.13,.33,i%3===0?'#6e8776':'#86674b',root,px,3.18,d/2+.22);
+    const end=cylinder(.085,.085,.066,'#77848c',root,px,3.78+.38*(Math.abs(px)/((w+1.25)/2))**5,d/2+.69,12);end.rotation.x=Math.PI/2;
+  }
+  for(let col=0;col<Math.floor(w/.72);col++){
+    const px=-w/2+.38+col*.72;
+    box(.68,.18,.12,col%2?'#a7a38f':'#c1bba2',root,px,.22,d/2+.29);
+  }
   for(const px of [-w/2+.5,w/2-.5])lantern(root,px,2.4,d/2+.65);
+  for(const side of [-1,1]){
+    const window=box(.075,.95,1.24,'#d9bc8a',root,side*(w/2-.065),2.1,0);
+    window.receiveShadow=true;
+    for(let i=-2;i<=2;i++)box(.085,.96,.035,palette.wood,root,side*(w/2-.06),2.1,i*.24);
+    for(const level of [1.64,1.92,2.21,2.56])box(.1,.05,1.28,palette.wood,root,side*(w/2-.06),level,0);
+    const jar=ball(.31,'#89634c',root,side*(w/2-.52),.64,d/2+.58,.9,1.2,.9);
+    jar.receiveShadow=true;
+    cylinder(.17,.19,.08,'#735442',root,side*(w/2-.52),.98,d/2+.58);
+  }
   return root;
 }
 for(const b of BUILDINGS)hanok(b.x,b.z,b.width,b.depth);
@@ -96,6 +130,7 @@ for(let i=0;i<8;i++){const stone=ball(.34,'#c6bea6',scene,-.7+Math.sin(i)*.32,.0
 
 const retreat=buildRetreat(scene);
 const rest=buildShelter(scene);
+const wetland=buildWetland(scene);
 const near=(point:Position,x:number,z:number,r:number)=>Math.hypot(point.x-x,point.z-z)<r;
 let viewing=false;
 const animateLandscape=expandLandscape(scene);
@@ -144,6 +179,7 @@ const villagers=homes.map(([x,z],kind)=>{
 let greetingUntil=0;
 $('greet').onclick=()=>{
  const {x,z}=player.root.position;
+ if(wetland.interact({x,z})){waveAt=performance.now();return;}
  if(near(chime,x,z,1.65)){rest.ring();return;}
  if(near(shelter,x,z,4.5)){rest.toggle();return;}
  if(retreat.interact(x,z))return;
@@ -169,15 +205,50 @@ petals.userData.dynamic=true;
 for(let i=0;i<42;i++){const petal=mesh(new T.SphereGeometry(.055,5,4),'#f1c4cc',petals,(rand()-.5)*30,1+rand()*7,(rand()-.5)*28);petal.scale.set(1,.25,.65);petal.castShadow=false;}
 const ripples:Array<T.Mesh>=[];
 for(let i=0;i<4;i++){const ring=mesh(new T.RingGeometry(.45,.47,40),'#b4e3d5',pond,-2+i*1.2,.16,-1+i*.4);ring.userData.dynamic=true;ring.rotation.x=-Math.PI/2;ring.castShadow=false;ripples.push(ring);}
-const player=person('#729cae');
+const player=person('#518ca5');
 const visit=new URLSearchParams(location.search).get('visit');
-const arrival=visit==='valley'?{x:shelter.x,z:shelter.z+3}:visit==='statue'?{x:shrine.x,z:shrine.z+5}:{x:0,z:5};
+const arrival=visit==='wetland'?WETLAND_ENTRY:visit==='valley'?{x:shelter.x,z:shelter.z+3}:visit==='statue'?{x:shrine.x,z:shrine.z+5}:{x:0,z:5};
 player.root.position.set(arrival.x,terrainHeight(arrival.x,arrival.z),arrival.z);
 // A small straw hat and its woven rim identify the player without adding instructional text.
 cylinder(.71,.74,.055,'#dfbc72',player.root,0,2.04,0,32);
 ball(.46,'#c6a066',player.root,0,2.12,0,1,.55,1);
 const hatRibbon=mesh(new T.TorusGeometry(.43,.04,5,28),'#7c8463',player.root,0,2.1,0);hatRibbon.rotation.x=Math.PI/2;
 ball(.09,'#dea15d',player.root,.16,2.22,.36);
+// The artwork's T pose is the neutral rig reference. Shoulder, elbow, hip and knee pivots animate independently.
+const playerModel=new T.Group();
+while(player.root.children.length)playerModel.add(player.root.children[0]);
+player.root.add(playerModel);
+const knees=player.legs.map(leg=>{
+  const pivot=new T.Group();pivot.position.y=-.17;leg.add(pivot);
+  pivot.attach(leg.children[1]);return pivot;
+});
+const elbows=player.arms.map(arm=>{
+  const pivot=new T.Group();pivot.position.y=-.2;arm.add(pivot);
+  pivot.attach(arm.children[1]);return pivot;
+});
+const posing=visit==='rig';
+const medal=ball(.115,'#d5aa61',playerModel,.09,1.01,.39,1,1,.27);
+medal.castShadow=false;
+for(const x of [-.27,.27])ball(.105,'#f0c7a0',playerModel,x*1.55,1.6,.01,.68,1,.75);
+for(const side of [-1,1]){
+  const eye=ball(.019,'#fff2db',playerModel,side*.14-.008,1.669,.428,.82,1,.45);
+  eye.castShadow=false;
+  const brow=ball(.056,'#47382c',playerModel,side*.14,1.735,.411,1,.25,.28);
+  brow.rotation.z=side*.1;
+  const cuff=box(.24,.105,.25,'#e7debe',elbows[side===-1?0:1],side*.06,-.11,0);
+  cuff.rotation.z=side*.09;
+}
+const smile=new T.CatmullRomCurve3([new T.Vector3(-.05,1.527,.429),new T.Vector3(0,1.51,.438),new T.Vector3(.05,1.527,.429)]);
+mesh(new T.TubeGeometry(smile,14,.011,6,false),'#956254',playerModel);
+for(let i=0;i<6;i++){
+  const band=mesh(new T.TorusGeometry(.47+i*.041,.009,6,44),i%2?'#c99759':'#eac883',playerModel,0,2.075,0);
+  band.rotation.x=Math.PI/2;
+}
+let seated=false,jumpAt=-1000,waveAt=-1000;
+function jump(){if(performance.now()-jumpAt>=630){seated=false;jumpAt=performance.now();}}
+function sit(){seated=!seated;route=[];marker.visible=false;}
+$('jump').onclick=jump;
+$('sit').onclick=sit;
 const guide=person('#c7889d');guide.root.position.set(2,0,1);guide.root.rotation.y=-.4;
 const marker=mesh(new T.RingGeometry(.22,.29,28),'#fff4cd');marker.rotation.x=-Math.PI/2;marker.position.y=.07;marker.visible=false;marker.castShadow=false;
 marker.userData.dynamic=true;
@@ -199,18 +270,41 @@ $('map-view').onclick=()=>{overview=!overview;zoom=1;focus.set(overview?0:player
 const raycaster=new T.Raycaster(),pointer=new T.Vector2(),plane=new T.Plane(new T.Vector3(0,1,0),0);
 canvas.onpointerdown=e=>{canvas.focus();const rect=canvas.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);plane.constant=0;const hit=raycaster.ray.intersectPlane(plane,new T.Vector3());if(!hit)return;for(let i=0;i<5;i++){plane.constant=-terrainHeight(hit.x,hit.z);if(!raycaster.ray.intersectPlane(plane,hit))return;}route=findRoute(player.root.position,{x:hit.x,z:hit.z});if(route.length){marker.position.set(hit.x,terrainHeight(hit.x,hit.z)+.07,hit.z);marker.visible=true;}else message('건물과 연못을 피해 빈 땅을 눌러 주세요.');};
 const vectors:Record<string,[number,number]>={w:[0,-1],arrowup:[0,-1],s:[0,1],arrowdown:[0,1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
-window.addEventListener('keydown',e=>{if(vectors[e.key.toLowerCase()]){e.preventDefault();pressed.add(e.key.toLowerCase());route=[];marker.visible=false;}});
+window.addEventListener('keydown',e=>{
+  if(!e.repeat&&!e.target?.toString().includes('Button')){
+    if(e.code==='Space'){e.preventDefault();jump();}
+    if(e.code==='KeyC')sit();
+  }
+  if(vectors[e.key.toLowerCase()]){e.preventDefault();pressed.add(e.key.toLowerCase());route=[];marker.visible=false;}});
 window.addEventListener('keyup',e=>pressed.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>pressed.clear());
 document.querySelectorAll<HTMLButtonElement>('[data-move]').forEach(button=>{button.onpointerdown=e=>{button.setPointerCapture(e.pointerId);pressed.add(button.dataset.move!);route=[];};const release=()=>pressed.delete(button.dataset.move!);button.onpointerup=release;button.onpointercancel=release;button.onlostpointercapture=release;});
 batchStaticLandscape(scene);
 let before=0;
+let running=false;
+const movingSpeed=()=>running?7:4;
+window.addEventListener('keydown',e=>{if(e.key==='Shift')running=true;});
+window.addEventListener('keyup',e=>{if(e.key==='Shift')running=false;});
+window.addEventListener('blur',()=>{running=false;});
 function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;let dx=0,dz=0;
   for(const key of pressed){const [x,z]=vectors[key];dx+=x*Math.cos(angle)+z*Math.sin(angle);dz+=-x*Math.sin(angle)+z*Math.cos(angle);}
   if(!pressed.size&&route.length){const p=route[0],dist=Math.hypot(p.x-player.root.position.x,p.z-player.root.position.z);if(dist<.12)route.shift();else{dx=(p.x-player.root.position.x)/dist;dz=(p.z-player.root.position.z)/dist;}}
   const length=Math.hypot(dx,dz);moving=false;
-  if(length){dx/=length;dz/=length;const p=player.root.position,nx=p.x+dx*4*dt,nz=p.z+dz*4*dt;if(canWalk({x:nx,z:p.z})){p.x=nx;moving=true;}if(canWalk({x:p.x,z:nz})){p.z=nz;moving=true;}player.root.rotation.y=Math.atan2(dx,dz);}
-  player.legs.forEach((leg,i)=>leg.rotation.x=moving?Math.sin(ms*.012+i*Math.PI)*.5:0);
-  player.arms.forEach((arm,i)=>arm.rotation.x=moving?-Math.sin(ms*.012+i*Math.PI)*.4:0);
+  if(length){seated=false;dx/=length;dz/=length;const p=player.root.position,nx=p.x+dx*(movingSpeed())*dt,nz=p.z+dz*(movingSpeed())*dt;if(canWalk({x:nx,z:p.z})){p.x=nx;moving=true;}if(canWalk({x:p.x,z:nz})){p.z=nz;moving=true;}player.root.rotation.y=Math.atan2(dx,dz);}
+  const jumpProgress=Math.min(1,Math.max(0,(ms-jumpAt)/630));
+  const airborne=Math.sin(jumpProgress*Math.PI);
+  playerModel.position.y=airborne*.98-(seated?.34:0);
+  player.legs.forEach((leg,i)=>{
+    leg.rotation.x=seated?-1.35:airborne*-.43+(moving?Math.sin(ms*.014+i*Math.PI)*.58:0);
+    knees[i].rotation.x=seated?1.3:airborne*.65;
+  });
+  const waving=ms-waveAt<1000;
+  player.arms.forEach((arm,i)=>{
+    arm.rotation.x=moving?-Math.sin(ms*.014+i*Math.PI)*.42:0;
+    arm.rotation.z=posing?(i===0?-1:1)*Math.PI/2:airborne*(i===0?-1:1)*.52;
+    elbows[i].rotation.z=waving&&i===1?1+.23*Math.sin(ms*.031):0;
+    if(waving&&i===1&&!posing)arm.rotation.z=1.26;
+  });
+  $('sit').setAttribute('aria-pressed',String(seated));
   player.body.position.y=.86+(moving?Math.abs(Math.sin(ms*.012))*.035:0);
   // Camera follows the walker, so the added districts are explorable instead of off-screen decoration.
   const riverDistance=player.root.position.z-riverCenter(player.root.position.x);
@@ -224,9 +318,10 @@ function animate(ms:number){const dt=Math.min((ms-before)/1000,.04);before=ms;le
   const nearStatue=Math.hypot(player.root.position.x-shrine.x,player.root.position.z-shrine.z)<7;
   const {x,z}=player.root.position;
   const byChime=near(chime,x,z,1.65),byShelter=near(shelter,x,z,4.5);
-  const action=$('greet'),label=byChime?'풍경 건드리기':byShelter?(rest.listening?'계곡 소리 끄기':'계곡 소리 듣기'):nearBell?'범종 울리기':nearStatue?'불상 감상 전환':'가까운 주민에게 인사하기';
-  if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z');}
-  rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
+  const stop=wetlandStop({x,z}),wetlandAction=stop?wetlandActions[stop]:undefined;
+  const action=$('greet'),label=wetlandAction?.label??(byChime?'풍경 건드리기':byShelter?(rest.listening?'계곡 소리 끄기':'계곡 소리 듣기'):nearBell?'범종 울리기':nearStatue?'불상 감상 전환':'가까운 주민에게 인사하기');
+  if(action.getAttribute('aria-label')!==label){action.setAttribute('aria-label',label);action.title=label;action.querySelector('path')?.setAttribute('d',wetlandAction?.icon??(byShelter&&!byChime?'M2 8q3-4 6 0t6 0t8 0M2 15q3-4 6 0t6 0t8 0':byChime||nearBell?'M4 17h16l-2-3V9a6 6 0 0 0-12 0v5z M10 20h4':nearStatue?'M2 12Q12 -2 22 12Q12 26 2 12Z M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0':'M20 11c0 5-8 10-8 10S4 16 4 11a4 4 0 0 1 8-2 4 4 0 0 1 8 2Z'));}
+  wetland.update(ms);rest.animate(ms,x,z);retreat.animate(ms);animateLandscape(ms);
   guide.head.rotation.z=Math.sin(ms*.001)*.025;
   villagers.forEach(({actor,home,kind})=>{
     const phase=ms*.00035+kind*1.7;

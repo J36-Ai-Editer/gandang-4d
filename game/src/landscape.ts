@@ -49,6 +49,7 @@ export function expandLandscape(scene:T.Scene) {
   trail([[0,28],[-7,36],[-24,39],[-41,28],[-46,11],[-44,-8],[-39,-32],[-22,-39],[3,-35],[26,-39],[43,-28],[47,-6],[45,18],[34,37],[15,45],[0,28]],3.2);
   trail([[3,-35],[8,-48],[2,-58],[-7,-68],[-2,-72],[10,-77],[24,-72],[37,-57],[26,-39]],3.4);
   trail([[-41,28],[-67,42],[-81,65],[-55,83],[-12,87],[42,78],[79,55],[63,32],[45,18]],3);
+  trail([[26,-39],[36,-39],[48,-42],[56,-41],[62,-39],[70,-39],[76,-49],[74,-58],[63,-58],[52,-54],[48,-42]],2.85);
   trail([[0,3],[-2,-10],[0,riverCenter(0)],[3,-35]],4.2);
   trail([[-25,3],[-27,-8],[-25,riverCenter(-25)],[-22,-39]],3.6);
   trail([[25,6],[27,-8],[25,riverCenter(25)],[26,-39]],3.6);
@@ -237,7 +238,7 @@ export function batchStaticLandscape(scene:T.Scene) {
   type Batch={material:T.Material;geometries:T.BufferGeometry[];meshes:T.Mesh[];cast:boolean;receive:boolean};
   const groups=new Map<string,Batch>();
   scene.traverse(object=>{
-    if(!(object instanceof T.Mesh)||Array.isArray(object.material))return;
+    if(!(object instanceof T.Mesh)||object instanceof T.InstancedMesh||Array.isArray(object.material))return;
     for(let p:T.Object3D|null=object;p;p=p.parent)if(p.userData.dynamic)return;
     const key=object.material.uuid+object.castShadow+object.receiveShadow;
     const group:Batch=groups.get(key)??{material:object.material,geometries:[],meshes:[],cast:object.castShadow,receive:object.receiveShadow};

@@ -2,3 +2,5 @@
 
 .greet{position:absolute;right:20px;bottom:24px;width:58px;height:58px;background:#856879e8}
 .camera-tools{display:grid;grid-template-columns:repeat(3,46px);gap:7px}#sound[aria-pressed="true"] .mute-line{display:none}#sound[aria-pressed="true"],#map-view[aria-pressed="true"]{background:#bc9870;color:#fff}.camera-tools button{box-shadow:0 4px 15px #283d2a22}@media(max-width:600px){.camera-tools{grid-template-columns:repeat(3,44px);gap:5px}}
+#wetland-status{pointer-events:none;position:absolute;top:max(20px,env(safe-area-inset-top));left:14px;max-width:calc(100% - 28px);background:#34483ddd;color:#fff9e8;padding:8px 12px;border-radius:12px;opacity:0}#wetland-status.show{animation:wetland-notice 3.6s both}@keyframes wetland-notice{0%,100%{opacity:0}8%,83%{opacity:1}}@media(max-width:600px){#wetland-status{top:116px}}
+.pose-tools{display:flex;gap:6px;position:absolute;right:20px;bottom:92px}.pose-tools button[aria-pressed="true"]{background:#bc9870}
