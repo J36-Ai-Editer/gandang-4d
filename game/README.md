@@ -64,3 +64,11 @@ Space로 점프, Shift를 누른 채 방향키로 달리기, 마을 벤치나 �
 - 한옥 안채 · AssetKitDB by Curator Danbi. AssetKitDB Free License. 전체 단지에서 안채의 외장 부품을 추려 배치했습니다. https://assetkitdb.min-inter.co.kr/a/kr-traditional-korean-hanok/
 - 걷기·달리기 · Quaternius Animated Men Pack, CC0 1.0. Man_Walk 및 Man_Run의 왼쪽 위다리 회전을 정규화해 간당간당의 주인공과 주민 관절에 적용했습니다. https://quaternius.com/packs/animatedmen.html
 솔숲 소나무·바위 GLB는 Quaternius Ultimate Stylized Nature Pack (CC0 1.0)에서 가져왔습니다. https://poly.pizza/m/w8ZaiYjK8C · https://poly.pizza/m/OQvi8PIZ40. 소리 아이콘을 켜고 숲 안쪽으로 걸으면 합성 솔바람이 커지고 마을 음악이 작아집니다.
+MVP 진입 화면은 /login.html에서 열립니다. 소셜 4종은 인증 준비 안내를 표시하며, 게스트 링크는 기존 3D 마을로 이동합니다.
+이메일 로그인은 같은 출처의 /api/v1/auth/login에 연결됩니다. Vite 개발·미리보기 서버는 127.0.0.1:8000의 기존 FastAPI로 인증 요청을 전달합니다. 운영 환경에서는 동일 경로를 FastAPI에 라우팅해야 합니다. 소셜 로그인은 공급자 등록과 콜백 구현이 필요합니다.
+로그인 게임 타이틀은 간당간당 브랜딧 워드마크 B에서 글리프를 가져와 두 줄로 재조판하고 CSS 모션을 적용했습니다.
+
+Cafe24 배포 구성은 aidentity-web/nginx-game-auth.conf에 있습니다. 활성 HTTPS 가상 호스트에 포함하고 nginx -t로 확인한 뒤 패키지를 배포합니다. 운영에서 이메일 로그인 요청과 세션 갱신이 성공하는지 별도 검증해야 합니다. 초기 화면의 서비스 로고는 Simple Icons의 Google, Naver, KakaoTalk, Apple 벡터를 사용합니다. 각 상표는 해당 권리자에게 귀속됩니다.
+로그인 화면 오른쪽 상단에서 한국어·영어·일본어·중국어 간체를 선택할 수 있으며, 선택은 브라우저에 저장됩니다.
+로그인 화면의 두 줄 로고는 둥근 획으로 새로 그린 간당 워드마크이며, 줄별로 부드럽게 움직입니다.
+입구 배경은 손그림 한옥 원본에 산책하는 가족과 먼 산길의 십이지신 주민을 추가한 그림입니다. 입구는 간당간당용으로 새로 만든 피아노 루프를 재생하며, 자동재생이 차단되면 첫 화면 입력에서 재시도합니다.
