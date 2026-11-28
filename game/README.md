@@ -1,5 +1,11 @@
 # 간당간당3D ver.1
 
+## 마을 한옥 앞까지 걷기
+
+[간당간당4D 입구](https://aidentity.kr/game3d/login.html)에서 **로그인 없이 체험하기**로 마을에 들어갑니다. 광장에서 한옥의 지붕이나 벽을 클릭하거나 터치하면 주인공이 앞계단까지 걸어갑니다. 방향키나 WASD로 직접 걸어갈 수도 있습니다.
+
+게임은 AssetKitDB by Curator Danbi의 한옥 중 안채 부품 11개를 사용합니다. Blender에서 기와 재질을 청회색으로 조정한 게임용 모델은 `public/assets/hanok-anchae-v2.glb`입니다. [한옥 원작](https://assetkitdb.min-inter.co.kr/a/kr-traditional-korean-hanok/) · [AssetKitDB Free License](https://assetkitdb.min-inter.co.kr/license/mininter-free/)
+
 2026-11-23 사용자가 지정한 현재 버전 이름. 화면 안내 문구를 제거한 SVG 아이콘 UI. 접근성 이름은 유지한다. 버전 메타데이터: `release.json`.
 
 # 현재 화면: 3D 스타일 검토 시안

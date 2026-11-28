@@ -59,8 +59,13 @@ for(const [cx,cz] of [[59,-70],[84,-70],[87,-89],[58,-91],[70,-96],[94,-80]]){
     GROVE_TREES.push({x,z,scale:1+groveRand()*.8,peach:false});
   }
 }
+export const VILLAGE_HANOK:Obstacle = {x:-7,z:-4,width:7,depth:5};
+export const HANOK_ENTRANCE:Position = {
+  x:VILLAGE_HANOK.x,
+  z:VILLAGE_HANOK.z+VILLAGE_HANOK.depth/2+1,
+};
 export const BUILDINGS:Obstacle[] = [
-  {x:-7,z:-4,width:7,depth:5},
+  VILLAGE_HANOK,
   {x:8,z:6,width:5.5,depth:4},
   {x:-5,z:-14,width:6,depth:4},
 ];

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canWalk,findRoute,riverCenter,riverHalfWidth,terrainHeight,GROVE_TREES,WETLAND_POOL,WETLAND_STOPS,wetlandStop,FOREST_ENTRY,FOREST_STOPS,forestStop} from './world3d.ts';
+import {canWalk,findRoute,riverCenter,riverHalfWidth,terrainHeight,GROVE_TREES,HANOK_ENTRANCE,VILLAGE_HANOK,WETLAND_POOL,WETLAND_STOPS,wetlandStop,FOREST_ENTRY,FOREST_STOPS,forestStop} from './world3d.ts';
 test('3D village blocks buildings, water and boundary while keeping plaza open',()=>{
   assert.equal(canWalk({x:0,z:4}),true);
   for(const p of [{x:-7,z:-4},{x:8,z:6},{x:7,z:-5},{x:105,z:0},{x:NaN,z:0}])assert.equal(canWalk(p),false);
@@ -29,6 +29,13 @@ test('click route goes around a solid hanok footprint',()=>{
   assert.ok(route.length>10);assert.ok(route.every(canWalk));
   assert.deepEqual(route.at(-1),{x:-7,z:-9});
   assert.deepEqual(findRoute({x:0,z:0},{x:7,z:-5}),[]);
+});
+test('the player can walk from the village spawn to the front of the Blender hanok',()=>{
+  const route=findRoute({x:0,z:5},HANOK_ENTRANCE);
+  assert.deepEqual(route.at(-1),HANOK_ENTRANCE);
+  assert.ok(route.every(canWalk));
+  assert.equal(canWalk(VILLAGE_HANOK),false);
+  assert.ok(HANOK_ENTRANCE.z>VILLAGE_HANOK.z+VILLAGE_HANOK.depth/2);
 });
 test('temple forecourt allows viewing while protecting the sculpture',()=>{assert.ok(canWalk({x:10,z:-77}));assert.equal(canWalk({x:10,z:-82}),false);assert.ok(terrainHeight(10,-77)>10);});
 test('the waterfall shelter approach is reachable from the village',()=>{assert.ok(findRoute({x:0,z:5},{x:-40,z:-32}).length);});

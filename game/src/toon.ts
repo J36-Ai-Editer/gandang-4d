@@ -8,7 +8,7 @@ import {WETLAND_ENTRY,wetlandStop} from './world3d.ts';
 import {buildShelter,shelter,chime} from './shelter.ts';
 import * as T from 'three';
 import './toon.css';
-import {BUILDINGS,BRIDGE_X,canWalk,findRoute,riverCenter,terrainHeight,type Position} from './world3d.ts';
+import {BUILDINGS,BRIDGE_X,HANOK_ENTRANCE,VILLAGE_HANOK,canWalk,findRoute,riverCenter,terrainHeight,type Position} from './world3d.ts';
 import {buildRetreat,shrine,bell} from './retreat.ts';
 import {expandLandscape,batchStaticLandscape} from './landscape.ts';
 import {connectVillageAudio} from './village-audio.ts';
@@ -103,11 +103,13 @@ function hanok(x:number,z:number,w:number,d:number){const root=new T.Group();roo
   }
   return root;
 }
-BUILDINGS.forEach((b,index)=>{
+let villageHanok:T.Object3D|undefined;
+BUILDINGS.forEach(b=>{
   const fallback=hanok(b.x,b.z,b.width,b.depth);
-  if(index!==0)return;
+  if(b!==VILLAGE_HANOK)return;
   fallback.userData.dynamic=true;
-  const modelUrl=new URL('assets/hanok-anchae.glb',document.baseURI).href;
+  villageHanok=fallback;
+  const modelUrl=new URL('assets/hanok-anchae-v2.glb',document.baseURI).href;
   void new GLTFLoader().loadAsync(modelUrl).then(({scene:model})=>{
     const bounds=new T.Box3().setFromObject(model);
     const size=bounds.getSize(new T.Vector3()),center=bounds.getCenter(new T.Vector3());
@@ -117,19 +119,10 @@ BUILDINGS.forEach((b,index)=>{
     model.traverse(part=>{
       if(!(part instanceof T.Mesh))return;
       part.castShadow=true;part.receiveShadow=true;
-      const name=part.name+' '+(part.parent?.name??'');
-      if(/anchae-(roof|ridge|caps)/.test(name)){
-        const shades=Array.isArray(part.material)?part.material:[part.material];
-        for(const surface of shades){
-          if(surface instanceof T.MeshStandardMaterial){
-            surface.color.lerp(new T.Color('#52616c'),.82);
-            surface.roughness=.86;surface.metalness=0;
-          }
-        }
-      }
     });
     scene.add(model);fallback.visible=false;
-    canvas.dataset.hanok='anchae';
+    villageHanok=model;
+    canvas.dataset.hanok='anchae-v2';
   }).catch(()=>{canvas.dataset.hanok='fallback';});
 });
 // Pond: shaped basin, rock edge, water lilies and a pavilion.
@@ -359,7 +352,26 @@ $('zoom-out').onclick=()=>{zoom=Math.max(.7,zoom-.15);updateCamera();};
 $('reset-view').onclick=()=>{overview=false;angle=.42;zoom=1;updateCamera();$('map-view').setAttribute('aria-pressed','false');};
 $('map-view').onclick=()=>{overview=!overview;zoom=1;focus.set(overview?0:player.root.position.x,0,overview?-3:player.root.position.z);$('map-view').setAttribute('aria-pressed',String(overview));updateCamera();};
 const raycaster=new T.Raycaster(),pointer=new T.Vector2(),plane=new T.Plane(new T.Vector3(0,1,0),0);
-canvas.onpointerdown=e=>{canvas.focus();const rect=canvas.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);plane.constant=0;const hit=raycaster.ray.intersectPlane(plane,new T.Vector3());if(!hit)return;for(let i=0;i<5;i++){plane.constant=-terrainHeight(hit.x,hit.z);if(!raycaster.ray.intersectPlane(plane,hit))return;}route=findRoute(player.root.position,{x:hit.x,z:hit.z});if(route.length){marker.position.set(hit.x,terrainHeight(hit.x,hit.z)+.07,hit.z);marker.visible=true;}else message('건물과 연못을 피해 빈 땅을 눌러 주세요.');};
+canvas.onpointerdown=e=>{
+  canvas.focus();
+  const rect=canvas.getBoundingClientRect();
+  pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
+  raycaster.setFromCamera(pointer,camera);
+  plane.constant=0;
+  const hit=raycaster.ray.intersectPlane(plane,new T.Vector3());
+  if(!hit)return;
+  for(let i=0;i<5;i++){
+    plane.constant=-terrainHeight(hit.x,hit.z);
+    if(!raycaster.ray.intersectPlane(plane,hit))return;
+  }
+  const houseHit=villageHanok && raycaster.intersectObject(villageHanok,true)[0];
+  const target=houseHit && houseHit.distance<=raycaster.ray.origin.distanceTo(hit)
+    ? HANOK_ENTRANCE : hit;
+  route=findRoute(player.root.position,target);
+  marker.visible=route.length>0;
+  if(marker.visible)marker.position.set(target.x,terrainHeight(target.x,target.z)+.07,target.z);
+  else message('건물과 연못을 피해 빈 땅을 눌러 주세요.');
+};
 const vectors:Record<string,[number,number]>={w:[0,-1],arrowup:[0,-1],s:[0,1],arrowdown:[0,1],a:[-1,0],arrowleft:[-1,0],d:[1,0],arrowright:[1,0]};
 window.addEventListener('keydown',e=>{
   if(!e.repeat&&!e.target?.toString().includes('Button')){
